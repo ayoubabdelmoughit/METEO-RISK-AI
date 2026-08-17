@@ -1,0 +1,3144 @@
+[
+  {
+    "name": "METEO-RISK AI",
+    "variables": {},
+    "secrets": {},
+    "nodes": [
+      {
+        "id": "b9d49f41-e701-49cc-8084-6f036836af1c",
+        "position": {
+          "x": -207.2509433070222,
+          "y": -137.418587395981
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "http-request",
+          "label": "HTTP Request",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Performs an HTTP request to a specified URL.",
+          "showRunningStatus": true,
+          "parameters": {
+            "method": "GET",
+            "authType": "none",
+            "responseType": "json",
+            "url": "https://api.open-meteo.com/v1/forecast?latitude=33.5883&longitude=-7.6114&hourly=rain,precipitation_probability,precipitation&current=temperature_2m,relative_humidity_2m,precipitation,rain,wind_speed_10m,wind_gusts_10m,pressure_msl,surface_pressure&timezone=Africa%2FCasablanca"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "fz0nt7olyassi2sqqp8oia8i",
+        "position": {
+          "x": -207.45010457214633,
+          "y": 15.18856302266073
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "http-request",
+          "label": "HTTP Geo",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Performs an HTTP request to a specified URL.",
+          "showRunningStatus": true,
+          "parameters": {
+            "method": "GET",
+            "authType": "none",
+            "responseType": "json",
+            "url": "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={{latitude}}&longitude={{longitude}}&localityLanguage=fr"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "450ef761-db6a-4be5-b31b-6658e7249501",
+        "position": {
+          "x": 129.00508215024252,
+          "y": -44.96051263296658
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Function_Data_Risk",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ======================================================\n// METEO-RISK AI\n// AI FLOOD EARLY WARNING\n// FUNCTION : DATA + FLOOD RISK SCORE\n// WEATHER + GEO + WATER LEVEL + WATER TREND\n// ======================================================\n\n\n// ------------------------------------------------------\n// 1. NORMALISATION DES INPUTS\n// ------------------------------------------------------\n\nconst items = Array.isArray(input) ? input : [input];\n\n\n// Weather\nconst weatherResponse = items.find(\n  item => item?.body?.current || item?.body?.hourly\n);\n\n\n// Geo\nconst geoResponse = items.find(\n  item =>\n    item?.body?.city ||\n    item?.body?.locality ||\n    item?.body?.location\n);\n\n\n// Water Sensor\nconst sensorResponse = items.find(\n  item => item?.sensor?.type === \"WATER_LEVEL\"\n);\n\n\n// Extraction\nconst data = weatherResponse?.body || {};\nconst geo = geoResponse?.body || {};\nconst sensor = sensorResponse?.sensor || {};\n\nconst current = data.current || {};\nconst hourly = data.hourly || {};\n\n\n// ------------------------------------------------------\n// 2. LOCALISATION\n// ------------------------------------------------------\n\nconst geoLocation = geo.location || {};\n\nconst location = {\n\n  city:\n    geo.city ||\n    geo.locality ||\n    geoLocation.city ||\n    sensor.city ||\n    \"Casablanca\",\n\n  country:\n    geo.countryName ||\n    geoLocation.country ||\n    \"Morocco\",\n\n  country_code:\n    geo.countryCode ||\n    geoLocation.country_code ||\n    \"MA\",\n\n  region:\n    geo.principalSubdivision ||\n    geoLocation.region ||\n    \"Casablanca-Settat\",\n\n  latitude: Number(\n    geo.latitude ??\n    geoLocation.latitude ??\n    data.latitude ??\n    0\n  ),\n\n  longitude: Number(\n    geo.longitude ??\n    geoLocation.longitude ??\n    data.longitude ??\n    0\n  ),\n\n  timezone:\n    data.timezone ||\n    geo.timezone ||\n    \"Africa/Casablanca\"\n};\n\n\n// ------------------------------------------------------\n// 3. MÉTÉO ACTUELLE\n// ------------------------------------------------------\n\nconst temperature = Number(\n  current.temperature_2m ?? 0\n);\n\nconst humidity = Number(\n  current.relative_humidity_2m ?? 0\n);\n\nconst precipitation = Number(\n  current.precipitation ?? 0\n);\n\nconst rain = Number(\n  current.rain ?? 0\n);\n\nconst wind = Number(\n  current.wind_speed_10m ?? 0\n);\n\nconst gust = Number(\n  current.wind_gusts_10m ?? 0\n);\n\nconst pressure = Number(\n  current.pressure_msl ??\n  current.surface_pressure ??\n  1013\n);\n\nconst timestamp =\n  current.time ||\n  new Date().toISOString();\n\n\n// ------------------------------------------------------\n// 4. WATER SENSOR\n// ------------------------------------------------------\n\nconst waterLevel = Number(\n  sensor.water_level_cm ?? 0\n);\n\nconst previousWaterLevel = Number(\n  sensor.previous_water_level_cm ??\n  waterLevel\n);\n\nconst warningLevel = Number(\n  sensor.warning_level_cm ?? 70\n);\n\nconst criticalLevel = Number(\n  sensor.critical_level_cm ?? 90\n);\n\n\n// Rise rate\nconst riseRate = Number(\n  sensor.rise_rate_cm ??\n  (waterLevel - previousWaterLevel)\n);\n\n\n// Trend\nconst waterTrend =\n  sensor.trend ||\n  (\n    riseRate >= 5\n      ? \"RISING_FAST\"\n      : riseRate > 0\n        ? \"RISING\"\n        : riseRate < 0\n          ? \"FALLING\"\n          : \"STABLE\"\n  );\n\n\nconst sensorStatus =\n  sensor.status || \"UNKNOWN\";\n\n\n// ------------------------------------------------------\n// 5. PRÉVISIONS\n// ------------------------------------------------------\n\nconst hourlyPrecipitation =\n  Array.isArray(hourly.precipitation)\n    ? hourly.precipitation\n    : [];\n\nconst hourlyRain =\n  Array.isArray(hourly.rain)\n    ? hourly.rain\n    : [];\n\nconst hourlyProbability =\n  Array.isArray(hourly.precipitation_probability)\n    ? hourly.precipitation_probability\n    : [];\n\n\n// 6 prochaines heures disponibles\nconst nextHoursPrecipitation =\n  hourlyPrecipitation\n    .slice(0, 6)\n    .reduce(\n      (sum, value) =>\n        sum + Number(value || 0),\n      0\n    );\n\nconst nextHoursRain =\n  hourlyRain\n    .slice(0, 6)\n    .reduce(\n      (sum, value) =>\n        sum + Number(value || 0),\n      0\n    );\n\nconst maxRainProbability =\n  hourlyProbability.length > 0\n    ? Math.max(\n        ...hourlyProbability\n          .slice(0, 6)\n          .map(value => Number(value || 0))\n      )\n    : 0;\n\n\n// ------------------------------------------------------\n// 6. INDICATEURS DE RISQUE\n// ------------------------------------------------------\n\nlet currentRainRisk = 0;\nlet forecastRainRisk = 0;\nlet persistenceRisk = 0;\n\nlet waterLevelRisk = 0;\nlet waterTrendRisk = 0;\n\nlet humidityRisk = 0;\nlet pressureRisk = 0;\nlet windRisk = 0;\n\n\n// ------------------------------------------------------\n// 7. PLUIE ACTUELLE\n// ------------------------------------------------------\n\nconst rainValue = Math.max(\n  rain,\n  precipitation\n);\n\nif (rainValue >= 30) {\n\n  currentRainRisk = 100;\n\n} else if (rainValue >= 20) {\n\n  currentRainRisk = 90;\n\n} else if (rainValue >= 10) {\n\n  currentRainRisk = 70;\n\n} else if (rainValue >= 5) {\n\n  currentRainRisk = 45;\n\n} else if (rainValue > 0) {\n\n  currentRainRisk = 20;\n}\n\n\n// ------------------------------------------------------\n// 8. PRÉVISIONS PLUIE\n// ------------------------------------------------------\n\nif (nextHoursPrecipitation >= 50) {\n\n  forecastRainRisk = 100;\n\n} else if (nextHoursPrecipitation >= 30) {\n\n  forecastRainRisk = 85;\n\n} else if (nextHoursPrecipitation >= 20) {\n\n  forecastRainRisk = 70;\n\n} else if (nextHoursPrecipitation >= 10) {\n\n  forecastRainRisk = 50;\n\n} else if (nextHoursPrecipitation >= 5) {\n\n  forecastRainRisk = 30;\n}\n\n\n// ------------------------------------------------------\n// 9. PERSISTANCE\n// ------------------------------------------------------\n\nif (\n  rainValue > 0 &&\n  nextHoursPrecipitation >= 20\n) {\n\n  persistenceRisk = 100;\n\n} else if (\n  rainValue > 0 &&\n  nextHoursPrecipitation >= 10\n) {\n\n  persistenceRisk = 70;\n\n} else if (\n  rainValue > 0\n) {\n\n  persistenceRisk = 30;\n}\n\n\n// ------------------------------------------------------\n// 10. WATER LEVEL RISK\n// ------------------------------------------------------\n\nif (waterLevel >= criticalLevel) {\n\n  waterLevelRisk = 100;\n\n} else if (waterLevel >= warningLevel) {\n\n  waterLevelRisk = 75;\n\n} else if (\n  waterLevel >= warningLevel * 0.8\n) {\n\n  waterLevelRisk = 40;\n\n} else {\n\n  waterLevelRisk = 0;\n}\n\n\n// ------------------------------------------------------\n// 11. WATER TREND RISK\n// ------------------------------------------------------\n\nif (waterTrend === \"RISING_FAST\") {\n\n  waterTrendRisk = 100;\n\n} else if (waterTrend === \"RISING\") {\n\n  waterTrendRisk = 60;\n\n} else if (waterTrend === \"STABLE\") {\n\n  waterTrendRisk = 20;\n\n} else if (waterTrend === \"FALLING\") {\n\n  waterTrendRisk = 0;\n}\n\n\n// ------------------------------------------------------\n// 12. HUMIDITÉ\n// ------------------------------------------------------\n\nif (humidity >= 95) {\n\n  humidityRisk = 100;\n\n} else if (humidity >= 90) {\n\n  humidityRisk = 70;\n\n} else if (humidity >= 80) {\n\n  humidityRisk = 40;\n}\n\n\n// ------------------------------------------------------\n// 13. PRESSION\n// ------------------------------------------------------\n\nif (pressure < 990) {\n\n  pressureRisk = 100;\n\n} else if (pressure < 1000) {\n\n  pressureRisk = 70;\n\n} else if (pressure < 1010) {\n\n  pressureRisk = 40;\n}\n\n\n// ------------------------------------------------------\n// 14. VENT\n// ------------------------------------------------------\n\nif (gust >= 90) {\n\n  windRisk = 100;\n\n} else if (gust >= 70) {\n\n  windRisk = 75;\n\n} else if (gust >= 50) {\n\n  windRisk = 50;\n\n} else if (gust >= 30) {\n\n  windRisk = 25;\n}\n\n\n// ------------------------------------------------------\n// 15. FLOOD RISK SCORE\n// ------------------------------------------------------\n//\n// Pondération prototype:\n//\n// current rain      20%\n// forecast rain     18%\n// persistence       10%\n// water level       32%\n// water trend       12%\n// humidity           3%\n// pressure         2.5%\n// wind             2.5%\n//\n// TOTAL = 100%\n// ------------------------------------------------------\n\nlet riskScore = Math.round(\n\n  currentRainRisk * 0.20 +\n\n  forecastRainRisk * 0.18 +\n\n  persistenceRisk * 0.10 +\n\n  waterLevelRisk * 0.32 +\n\n  waterTrendRisk * 0.12 +\n\n  humidityRisk * 0.03 +\n\n  pressureRisk * 0.025 +\n\n  windRisk * 0.025\n\n);\n\n\nriskScore = Math.max(\n  0,\n  Math.min(100, riskScore)\n);\n\n\n// ------------------------------------------------------\n// 16. NIVEAU DE RISQUE\n// + RÈGLES DE SÉCURITÉ HYDROLOGIQUES\n// ------------------------------------------------------\n\nlet riskLevel;\n\n// CAS 1 : niveau critique + montée rapide\n// Priorité maximale\nif (\n  waterLevel >= criticalLevel &&\n  waterTrend === \"RISING_FAST\"\n) {\n\n  riskLevel = \"CRITICAL\";\n\n}\n\n// CAS 2 : niveau d'eau critique\n// Minimum HIGH même sans pluie\nelse if (\n  waterLevel >= criticalLevel\n) {\n\n  riskLevel = \"HIGH\";\n\n}\n\n// CAS 3 : niveau WARNING + montée rapide\nelse if (\n  waterLevel >= warningLevel &&\n  waterTrend === \"RISING_FAST\"\n) {\n\n  riskLevel = \"HIGH\";\n\n}\n\n// Sinon classification par score global\nelse if (riskScore >= 75) {\n\n  riskLevel = \"CRITICAL\";\n\n} else if (riskScore >= 50) {\n\n  riskLevel = \"HIGH\";\n\n} else if (riskScore >= 25) {\n\n  riskLevel = \"MEDIUM\";\n\n} else {\n\n  riskLevel = \"LOW\";\n\n}\n// ------------------------------------------------------\n// 17. RAISONS\n// ------------------------------------------------------\n\nconst reasons = [];\n\n\n// Rain\nif (rainValue >= 20) {\n\n  reasons.push(\n    `Fortes précipitations actuelles : ${rainValue} mm`\n  );\n\n} else if (rainValue >= 10) {\n\n  reasons.push(\n    `Précipitations importantes : ${rainValue} mm`\n  );\n\n} else if (rainValue >= 5) {\n\n  reasons.push(\n    `Précipitations modérées : ${rainValue} mm`\n  );\n}\n\n\n// Forecast\nif (nextHoursPrecipitation >= 20) {\n\n  reasons.push(\n    `Précipitations prévues importantes dans les prochaines heures : ${nextHoursPrecipitation.toFixed(1)} mm`\n  );\n}\n\n\n// Persistence\nif (persistenceRisk >= 70) {\n\n  reasons.push(\n    \"Persistance des précipitations détectée\"\n  );\n}\n\n\n// Probability\nif (maxRainProbability >= 70) {\n\n  reasons.push(\n    `Probabilité élevée de précipitations : ${maxRainProbability}%`\n  );\n}\n\n\n// Water level\nif (waterLevel >= criticalLevel) {\n\n  reasons.push(\n    `Niveau d'eau critique : ${waterLevel} cm`\n  );\n\n} else if (waterLevel >= warningLevel) {\n\n  reasons.push(\n    `Niveau d'eau élevé : ${waterLevel} cm`\n  );\n\n} else if (\n  waterLevel >= warningLevel * 0.8\n) {\n\n  reasons.push(\n    `Niveau d'eau à surveiller : ${waterLevel} cm`\n  );\n}\n\n\n// Water trend\nif (waterTrend === \"RISING_FAST\") {\n\n  reasons.push(\n    `Montée rapide du niveau d'eau : +${riseRate} cm`\n  );\n\n} else if (waterTrend === \"RISING\") {\n\n  reasons.push(\n    `Niveau d'eau en hausse : +${riseRate} cm`\n  );\n}\n\n\n// Humidity\nif (humidity >= 90) {\n\n  reasons.push(\n    `Humidité élevée : ${humidity}%`\n  );\n}\n\n\n// Pressure\nif (pressure < 1000) {\n\n  reasons.push(\n    `Pression atmosphérique basse : ${pressure} hPa`\n  );\n}\n\n\n// Wind\nif (gust >= 50) {\n\n  reasons.push(\n    `Rafales importantes : ${gust} km/h`\n  );\n}\n\n\n// ------------------------------------------------------\n// 18. ALERTE\n// ------------------------------------------------------\n\nconst alert =\n  riskLevel === \"HIGH\" ||\n  riskLevel === \"CRITICAL\";\n\n\n// ------------------------------------------------------\n// 19. MESSAGE\n// ------------------------------------------------------\n\nlet message;\n\nif (riskLevel === \"CRITICAL\") {\n\n  message =\n    \"ALERTE CRITIQUE : risque élevé d'inondation détecté. Une intervention immédiate est recommandée.\";\n\n} else if (riskLevel === \"HIGH\") {\n\n  message =\n    \"ALERTE ÉLEVÉE : les conditions hydrologiques et météorologiques indiquent un risque important d'inondation.\";\n\n} else if (riskLevel === \"MEDIUM\") {\n\n  message =\n    \"VIGILANCE : certains indicateurs météorologiques ou hydrologiques nécessitent une surveillance renforcée.\";\n\n} else {\n\n  message =\n    \"Conditions actuellement normales. Aucun risque élevé d'inondation détecté.\";\n}\n\n\n// ------------------------------------------------------\n// 20. CONSEILS\n// ------------------------------------------------------\n\nconst advice = [];\n\nif (riskLevel === \"CRITICAL\") {\n\n  advice.push(\n    \"Déclencher immédiatement le protocole d'alerte.\"\n  );\n\n  advice.push(\n    \"Informer les responsables et les équipes terrain.\"\n  );\n\n  advice.push(\n    \"Surveiller en continu le niveau d'eau.\"\n  );\n\n  advice.push(\n    \"Préparer les mesures d'évacuation si nécessaire.\"\n  );\n\n} else if (riskLevel === \"HIGH\") {\n\n  advice.push(\n    \"Renforcer immédiatement la surveillance.\"\n  );\n\n  advice.push(\n    \"Surveiller l'évolution du niveau d'eau.\"\n  );\n\n  advice.push(\n    \"Préparer les équipes d'intervention.\"\n  );\n\n} else if (riskLevel === \"MEDIUM\") {\n\n  advice.push(\n    \"Maintenir une surveillance météorologique et hydrologique renforcée.\"\n  );\n\n  advice.push(\n    \"Contrôler régulièrement le niveau d'eau.\"\n  );\n\n} else {\n\n  advice.push(\n    \"Aucune action d'urgence recommandée.\"\n  );\n}\n\n\n// ------------------------------------------------------\n// 21. SORTIE FINALE\n// ------------------------------------------------------\n\nreturn {\n\n  project: \"METEO-RISK AI\",\n\n  system: \"AI Flood Early Warning\",\n\n  location,\n\n  timestamp,\n\n\n  weather: {\n\n    temperature_c:\n      temperature,\n\n    humidity_percent:\n      humidity,\n\n    precipitation_mm:\n      precipitation,\n\n    rain_mm:\n      rain,\n\n    wind_kmh:\n      wind,\n\n    wind_gust_kmh:\n      gust,\n\n    pressure_hpa:\n      pressure\n  },\n\n\n  forecast: {\n\n    next_6h_precipitation_mm:\n      Number(\n        nextHoursPrecipitation.toFixed(2)\n      ),\n\n    next_6h_rain_mm:\n      Number(\n        nextHoursRain.toFixed(2)\n      ),\n\n    max_precipitation_probability_percent:\n      maxRainProbability\n  },\n\n\n  water_sensor: {\n\n    sensor_id:\n      sensor.sensor_id || \"\",\n\n    type:\n      sensor.type || \"WATER_LEVEL\",\n\n    previous_water_level_cm:\n      previousWaterLevel,\n\n    water_level_cm:\n      waterLevel,\n\n    rise_rate_cm:\n      riseRate,\n\n    trend:\n      waterTrend,\n\n    warning_level_cm:\n      warningLevel,\n\n    critical_level_cm:\n      criticalLevel,\n\n    status:\n      sensorStatus,\n\n    timestamp:\n      sensor.timestamp || null,\n\n    data_source:\n      sensor.data_source || \"UNKNOWN\"\n  },\n\n\n  risk: {\n\n    score:\n      riskScore,\n\n    level:\n      riskLevel,\n\n    alert,\n\n    message,\n\n    reasons,\n\n    indicators: {\n\n      current_rain:\n        currentRainRisk,\n\n      forecast_rain:\n        forecastRainRisk,\n\n      persistence:\n        persistenceRisk,\n\n      water_level:\n        waterLevelRisk,\n\n      water_trend:\n        waterTrendRisk,\n\n      humidity:\n        humidityRisk,\n\n      pressure:\n        pressureRisk,\n\n      wind:\n        windRisk\n    }\n  },\n\n\n  advice\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "q5x4dnm40c7yj91xev5b99x6",
+        "position": {
+          "x": 456.3016219542482,
+          "y": -227.75182601304397
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Function_Low",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nconst risk = data.risk || {};\nconst sensor = data.water_sensor || {};\n\nreturn {\n  ...data,\n\n  risk: {\n    ...risk,\n    level: \"LOW\",\n    alert: false\n  },\n\n  low_management: {\n    monitoring_required: true,\n    recovery_check_required: true,\n    water_level_cm: sensor.water_level_cm ?? null,\n    trend: sensor.trend || \"UNKNOWN\"\n  },\n\n  message:\n    \"Conditions de risque faible détectées. Surveillance normale. Si un incident est actif, vérifier les conditions de récupération avant clôture.\",\n\n  status: \"LOW_RISK_MONITORING\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "qedvgqa30k7o19lt8qyazkyj",
+        "position": {
+          "x": 669.5403525431236,
+          "y": -60.261886153541695
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Alert_Manager",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// ALERT MANAGER\n// ========================================\n\nconst data = input || {};\n\nconst risk = data.risk || {};\nconst action = data.action || {};\nconst location = data.location || {};\n\nconst level = risk.level || \"LOW\";\nconst score = Number(risk.score || 0);\n\nlet notificationRequired = false;\nlet emergency = false;\nlet priority = \"NORMAL\";\nlet channel = \"NONE\";\nlet actionRequired = false;\n\n\n// ========================================\n// DECISION SELON LE NIVEAU\n// ========================================\n\nif (level === \"LOW\") {\n\n  notificationRequired = false;\n  emergency = false;\n  priority = \"NORMAL\";\n  channel = \"NONE\";\n  actionRequired = false;\n\n} else if (level === \"MEDIUM\") {\n\n  notificationRequired = true;\n  emergency = false;\n  priority = \"MEDIUM\";\n  channel = \"MONITORING\";\n  actionRequired = false;\n\n} else if (level === \"HIGH\") {\n\n  notificationRequired = true;\n  emergency = false;\n  priority = \"HIGH\";\n  channel = \"ALERT\";\n  actionRequired = true;\n\n} else if (level === \"CRITICAL\") {\n\n  notificationRequired = true;\n  emergency = true;\n  priority = \"URGENT\";\n  channel = \"EMERGENCY\";\n  actionRequired = true;\n}\n\n\n// ========================================\n// OUTPUT\n// ========================================\n\nreturn {\n\n  // IMPORTANT :\n  // conserve toutes les données précédentes\n  ...data,\n\n  project:\n    data.project || \"METEO-RISK AI\",\n\n  system:\n    data.system || \"AI Flood Early Warning\",\n\n  location,\n\n  timestamp:\n    data.timestamp ||\n    new Date().toISOString(),\n\n\n  // Garde tout le risk original\n  risk: {\n    ...risk,\n\n    score,\n\n    level,\n\n    alert:\n      level === \"HIGH\" ||\n      level === \"CRITICAL\"\n  },\n\n\n  alert_management: {\n\n    notification_required:\n      notificationRequired,\n\n    emergency,\n\n    priority,\n\n    channel,\n\n    action_required:\n      actionRequired\n  },\n\n\n  // Prend le message déjà créé par Function_Data_Risk\n  message:\n    data.message ||\n    risk.message ||\n    \"Aucune alerte particulière.\",\n\n\n  // Garde les recommandations / advice\n  recommendations:\n    Array.isArray(data.recommendations)\n      ? data.recommendations\n      : Array.isArray(data.advice)\n        ? data.advice\n        : [],\n\n\n  status:\n    emergency\n      ? \"EMERGENCY\"\n      : actionRequired\n        ? \"ACTION_REQUIRED\"\n        : notificationRequired\n          ? \"MONITORING_ALERT\"\n          : \"NORMAL_MONITORING\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "nuqkq4kc6jweds33y6c356km",
+        "position": {
+          "x": 798.4765695372603,
+          "y": -21.808982351338525
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_MongoDB_Record",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// PREPARE MONGODB RECORD\n// ========================================\n\nconst data = input || {};\n\nconst location = data.location || {};\nconst weather = data.weather || {};\nconst forecast = data.forecast || {};\nconst waterSensor = data.water_sensor || {};\nconst risk = data.risk || {};\nconst alertManagement = data.alert_management || {};\n\nconst record = {\n  project: data.project || \"METEO-RISK AI\",\n\n  system:\n    data.system || \"AI Flood Early Warning\",\n\n  event_type:\n    \"FLOOD_RISK_ASSESSMENT\",\n\n  timestamp:\n    data.timestamp ||\n    new Date().toISOString(),\n\n  location: {\n    city: location.city || \"Unknown\",\n    country: location.country || \"Morocco\",\n    country_code: location.country_code || \"MA\",\n    region: location.region || \"\",\n    latitude: Number(location.latitude || 0),\n    longitude: Number(location.longitude || 0),\n    timezone: location.timezone || \"Africa/Casablanca\"\n  },\n\n  weather: {\n    temperature_c:\n      Number(weather.temperature_c || 0),\n\n    humidity_percent:\n      Number(weather.humidity_percent || 0),\n\n    precipitation_mm:\n      Number(weather.precipitation_mm || 0),\n\n    rain_mm:\n      Number(weather.rain_mm || 0),\n\n    wind_kmh:\n      Number(weather.wind_kmh || 0),\n\n    wind_gust_kmh:\n      Number(weather.wind_gust_kmh || 0),\n\n    pressure_hpa:\n      Number(weather.pressure_hpa || 0)\n  },\n\n  forecast: {\n    next_6h_precipitation_mm:\n      Number(forecast.next_6h_precipitation_mm || 0),\n\n    next_6h_rain_mm:\n      Number(forecast.next_6h_rain_mm || 0),\n\n    max_precipitation_probability_percent:\n      Number(\n        forecast.max_precipitation_probability_percent || 0\n      )\n  },\n\n  water_sensor: {\n    sensor_id:\n      waterSensor.sensor_id || \"\",\n\n    type:\n      waterSensor.type || \"WATER_LEVEL\",\n\n    previous_water_level_cm:\n      Number(\n        waterSensor.previous_water_level_cm || 0\n      ),\n\n    water_level_cm:\n      Number(\n        waterSensor.water_level_cm || 0\n      ),\n\n    rise_rate_cm:\n      Number(\n        waterSensor.rise_rate_cm || 0\n      ),\n\n    trend:\n      waterSensor.trend || \"UNKNOWN\",\n\n    warning_level_cm:\n      Number(\n        waterSensor.warning_level_cm || 0\n      ),\n\n    critical_level_cm:\n      Number(\n        waterSensor.critical_level_cm || 0\n      ),\n\n    status:\n      waterSensor.status || \"UNKNOWN\",\n\n    data_source:\n      waterSensor.data_source || \"UNKNOWN\",\n\n    timestamp:\n      waterSensor.timestamp || null\n  },\n\n  risk: {\n    score:\n      Number(risk.score || 0),\n\n    level:\n      risk.level || \"LOW\",\n\n    alert:\n      Boolean(risk.alert),\n\n    message:\n      risk.message || \"\",\n\n    reasons:\n      Array.isArray(risk.reasons)\n        ? risk.reasons\n        : [],\n\n    indicators:\n      risk.indicators || {}\n  },\n\n  alert_management: {\n    notification_required:\n      Boolean(alertManagement.notification_required),\n\n    emergency:\n      Boolean(alertManagement.emergency),\n\n    priority:\n      alertManagement.priority || \"NORMAL\",\n\n    channel:\n      alertManagement.channel || \"NONE\",\n\n    action_required:\n      Boolean(alertManagement.action_required)\n  },\n\n  message:\n    data.message ||\n    risk.message ||\n    \"\",\n\n  recommendations:\n    Array.isArray(data.recommendations)\n      ? data.recommendations\n      : Array.isArray(data.advice)\n        ? data.advice\n        : [],\n\n  status:\n    data.status || \"UNKNOWN\",\n\n  created_at:\n    new Date().toISOString()\n};\n\n// MongoDB attend un objet / record\nreturn record;"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "th21yjbmne1o3xpk1liramfc",
+        "position": {
+          "x": 980.2743452299111,
+          "y": -243.2521125138649
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Create_Alert_Message",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// CREATE ALERT MESSAGE\n// ========================================\n\nconst data = input || {};\n\nconst risk = data.risk || {};\nconst location = data.location || {};\nconst alert = data.alert_management || {};\n\nconst city = location.city || \"Localisation inconnue\";\nconst country = location.country || \"Maroc\";\n\nconst level = risk.level || \"UNKNOWN\";\nconst score = Number(risk.score || 0);\n\nlet title = \"\";\nlet emoji = \"\";\nlet action = \"\";\n\nif (level === \"MEDIUM\") {\n  emoji = \"🟡\";\n  title = \"VIGILANCE MÉTÉO\";\n  action = \"Renforcer la surveillance des zones sensibles.\";\n}\n\nif (level === \"HIGH\") {\n  emoji = \"🟠\";\n  title = \"ALERTE MÉTÉO ÉLEVÉE\";\n  action = \"Préparer les équipes et renforcer la surveillance.\";\n}\n\nif (level === \"CRITICAL\") {\n  emoji = \"🔴\";\n  title = \"ALERTE MÉTÉO CRITIQUE\";\n  action = \"Intervention immédiate recommandée.\";\n}\n\nconst recommendations = Array.isArray(data.recommendations)\n  ? data.recommendations\n  : [];\n\nconst recommendationText = recommendations.length > 0\n  ? recommendations.map((item, index) => `${index + 1}. ${item}`).join(\"\\n\")\n  : \"Aucune recommandation supplémentaire.\";\n\nconst message = `\n${emoji} <b>METEO-RISK AI — ${title}</b><br><br>\n\n📍 <b>Localisation :</b> ${city}, ${country}<br>\n🌍 <b>Région :</b> ${location.region || \"Non renseignée\"}<br>\n🧭 <b>Latitude :</b> ${location.latitude ?? \"N/A\"}<br>\n🧭 <b>Longitude :</b> ${location.longitude ?? \"N/A\"}<br><br>\n\n⚠️ <b>Niveau de risque :</b> ${level}<br>\n📊 <b>Score :</b> ${score}/100<br>\n🚨 <b>Priorité :</b> ${alert.priority || \"NORMAL\"}<br>\n📡 <b>Canal :</b> ${alert.channel || \"ALERT\"}<br><br>\n\n💬 <b>Message :</b><br>\n${data.message || \"Aucun message disponible.\"}<br><br>\n\n🎯 <b>Action recommandée :</b><br>\n${action}<br><br>\n\n📋 <b>Recommandations :</b><br>\n${recommendations\n  .map((item, index) => `${index + 1}. ${item}`)\n  .join(\"<br>\")}\n`;\nconst subject = `METEO-RISK AI — ALERTE ${level}`;\n\nreturn {\n  project: \"METEO-RISK AI\",\n\n  location,\n\n  timestamp:\n    data.timestamp ||\n    new Date().toISOString(),\n\n  risk,\n\n  alert_management: alert,\n\n  notification: {\n    required: true,\n    priority: alert.priority || \"NORMAL\",\n    channel: alert.channel || \"ALERT\"\n  },\n  subject,\n\n  message,\n\n  status: \"ALERT_MESSAGE_READY\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "vlnvaj6rue0iaeh4xezv5jyu",
+        "position": {
+          "x": 975.6621031419654,
+          "y": -138.04870815008252
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Create_Incident",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// CREATE INCIDENT\n// ========================================\n\nconst data = input || {};\n\nconst risk = data.risk || {};\nconst location = data.location || {};\nconst alertManagement = data.alert_management || {};\n\nconst now = new Date().toISOString();\n\n// ========================================\n// INCIDENT ID\n// ========================================\n\nconst incidentId = `INC-${Date.now()}`;\n\n// ========================================\n// INCIDENT TYPE\n// ========================================\n\nlet incidentType = \"WEATHER_RISK\";\n\nif (risk.level === \"HIGH\") {\n  incidentType = \"FLOOD_RISK_ALERT\";\n}\n\nif (risk.level === \"CRITICAL\") {\n  incidentType = \"FLOOD_EMERGENCY\";\n}\n\n// ========================================\n// PRIORITY\n// ========================================\n\nlet priority = alertManagement.priority || \"NORMAL\";\n\nif (risk.level === \"HIGH\") {\n  priority = \"HIGH\";\n}\n\nif (risk.level === \"CRITICAL\") {\n  priority = \"URGENT\";\n}\n\n// ========================================\n// INTERVENTION REQUIRED\n// ========================================\n\nconst interventionRequired =\n  risk.level === \"HIGH\" ||\n  risk.level === \"CRITICAL\";\n\n// ========================================\n// OUTPUT\n// ========================================\n\nreturn {\n  project: data.project || \"METEO-RISK AI\",\n\n  incident: {\n    incident_id: incidentId,\n    type: incidentType,\n    created_at: now,\n    status: \"OPEN\",\n    severity: risk.level || \"UNKNOWN\",\n    priority: priority,\n    intervention_required: interventionRequired\n  },\n\n  location: {\n    city: location.city || \"\",\n    country: location.country || \"\",\n    country_code: location.country_code || \"\",\n    region: location.region || \"\",\n    latitude: Number(location.latitude || 0),\n    longitude: Number(location.longitude || 0),\n    timezone: location.timezone || \"Africa/Casablanca\"\n  },\n\n  risk: {\n    score: Number(risk.score || 0),\n    level: risk.level || \"UNKNOWN\",\n    alert: Boolean(risk.alert)\n  },\n\n  alert_management: alertManagement,\n\n  message: data.message || \"\",\n\n  recommendations:\n    Array.isArray(data.recommendations)\n      ? data.recommendations\n      : [],\n\n  timestamp:\n    data.timestamp || now,\n\n  status: \"INCIDENT_OPEN\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "h0l71zm3l0ci6ooy3lgo55xj",
+        "position": {
+          "x": 1273.9318712703644,
+          "y": -151.03438231914066
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Assign_Intervention",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// ASSIGN INTERVENTION\n// ========================================\n\nconst data = input || {};\n\nconst incident = data.incident || {};\nconst risk = data.risk || {};\nconst location = data.location || {};\n\nconst now = new Date().toISOString();\n\n// ========================================\n// ÉQUIPE ET TYPE D'ACTION\n// ========================================\n\nlet team = \"Monitoring Team\";\nlet action = \"MONITORING\";\nlet responseTime = \"STANDARD\";\n\nif (risk.level === \"HIGH\") {\n  team = \"Flood Response Team\";\n  action = \"PREPARE_INTERVENTION\";\n  responseTime = \"30_MINUTES\";\n}\n\nif (risk.level === \"CRITICAL\") {\n  team = \"Emergency Response Team\";\n  action = \"IMMEDIATE_INTERVENTION\";\n  responseTime = \"IMMEDIATE\";\n}\n\n// ========================================\n// SORTIE\n// ========================================\n\nreturn {\n  ...data,\n\n  incident: {\n    ...incident,\n    status: \"ASSIGNED\"\n  },\n\n  intervention: {\n    required: true,\n    assigned_at: now,\n\n    team: team,\n\n    action: action,\n\n    response_time: responseTime,\n\n    location: {\n      city: location.city || \"\",\n      region: location.region || \"\",\n      latitude: Number(location.latitude || 0),\n      longitude: Number(location.longitude || 0)\n    },\n\n    status: \"PENDING_INTERVENTION\"\n  },\n\n  status: \"INTERVENTION_ASSIGNED\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "erjolmw5de2fo6pk21kg7ldb",
+        "position": {
+          "x": 1791.2949548511215,
+          "y": 173.65381301383152
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Complete_Intervention",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nconst incident = data.incident || {};\nconst intervention = data.intervention || {};\n\nconst now = new Date().toISOString();\n\nreturn {\n  ...data,\n\n  incident: {\n    ...incident,\n    status: \"COMPLETED\"\n  },\n\n  intervention: {\n    ...intervention,\n    status: \"COMPLETED\",\n    completed_at: now\n  },\n\n  status: \"INTERVENTION_COMPLETED\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "sm21n3pgmlhx6duvsxib1xd8",
+        "position": {
+          "x": 532.9278449810038,
+          "y": 211.01128852096025
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Check_Recovery",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// CHECK RECOVERY\n// INPUT = [activeIncident, currentRiskData]\n// ========================================\n\nconst items = Array.isArray(input) ? input : [input];\n\n// Incident actif من MongoDB\nconst activeIncident = items.find(\n  item => item?.incident?.status === \"IN_PROGRESS\"\n) || {};\n\n// Données actuelles météo / risque / sensor\nconst currentData = items.find(\n  item => item?.water_sensor || item?.system === \"AI Flood Early Warning\"\n) || {};\n\nconst incident = activeIncident.incident || {};\nconst intervention = activeIncident.intervention || {};\n\nconst risk = currentData.risk || {};\nconst sensor = currentData.water_sensor || {};\n\nconst waterLevel = Number(\n  sensor.water_level_cm || 0\n);\n\nconst warningLevel = Number(\n  sensor.warning_level_cm || 70\n);\n\nconst riskLevel = String(\n  risk.level || \"\"\n).toUpperCase();\n\nconst trend = String(\n  sensor.trend || \"\"\n).toUpperCase();\n\n\n// ========================================\n// RECOVERY RULES\n// ========================================\n//\n// Recovery فقط إلا:\n// - الماء هبط تحت warning\n// - risk ولى LOW\n// - الماء ما بقاش طالع\n// ========================================\n\nconst recoveryReady =\n  waterLevel < warningLevel &&\n  riskLevel === \"LOW\" &&\n  trend !== \"RISING_FAST\" &&\n  trend !== \"RISING\";\n\n\n// ========================================\n// OUTPUT\n// ========================================\n\nreturn {\n\n  // نخليو بيانات incident القديمة\n  ...activeIncident,\n\n  // ونزيدو القراءة الحالية\n  current_monitoring: {\n    timestamp:\n      currentData.timestamp ||\n      new Date().toISOString(),\n\n    water_sensor:\n      sensor,\n\n    risk:\n      risk,\n\n    weather:\n      currentData.weather || {},\n\n    forecast:\n      currentData.forecast || {}\n  },\n\n  recovery: {\n    ready:\n      recoveryReady,\n\n    incident_id:\n      incident.incident_id || \"\",\n\n    incident_status:\n      incident.status || \"\",\n\n    water_level_cm:\n      waterLevel,\n\n    warning_level_cm:\n      warningLevel,\n\n    risk_level:\n      riskLevel,\n\n    trend:\n      trend\n  },\n\n  status:\n    recoveryReady\n      ? \"RECOVERY_CONFIRMED\"\n      : \"INCIDENT_STILL_ACTIVE\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "sjfc32lir3jcm6uc9htih7nz",
+        "position": {
+          "x": 2011.9920193568714,
+          "y": 259.60679102110447
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Resolve_Incident",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// RESOLVE INCIDENT\n// ========================================\n\nconst data = input || {};\nconst incident = data.incident || {};\n\nconst now = new Date().toISOString();\n\nreturn {\n  ...data,\n\n  incident: {\n    ...incident,\n    status: \"RESOLVED\",\n    resolved_at: now\n  },\n\n  status: \"INCIDENT_RESOLVED\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "lnwrr6tkfyd0bqdhi3jix6dp",
+        "position": {
+          "x": 2169.4114762412382,
+          "y": 444.4968339395435
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Close_Incident",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// CLOSE INCIDENT\n// ========================================\n\nconst data = input || {};\nconst incident = data.incident || {};\n\nconst now = new Date().toISOString();\n\nreturn {\n  ...data,\n\n  incident: {\n    ...incident,\n    status: \"CLOSED\",\n    closed_at: now\n  },\n\n  status: \"INCIDENT_CLOSED\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "x3a99xzpbdpjlb106c4mw5s7",
+        "position": {
+          "x": 2009.9157555147115,
+          "y": 37.895327834518824
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_Completion_Update",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nreturn {\n  filter: {\n    \"incident.incident_id\": data.incident?.incident_id\n  },\n\n  update: {\n    \"incident.status\": data.incident?.status,\n    \"intervention.status\": data.intervention?.status,\n    \"intervention.completed_at\": data.intervention?.completed_at,\n    \"status\": data.status,\n    \"updated_at\": new Date().toISOString()\n  }\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "cg3p6a66kaghkhji647hfcgc",
+        "position": {
+          "x": 2011.467592809978,
+          "y": 133.8774177784417
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_History_COMPLETED",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nreturn {\n  incident_id: data.incident?.incident_id || \"\",\n  stage: \"COMPLETED\",\n\n  incident_status:\n    data.incident?.status || \"\",\n\n  intervention_status:\n    data.intervention?.status || \"\",\n\n  team:\n    data.intervention?.team || \"\",\n\n  city:\n    data.location?.city || \"\",\n\n  timestamp:\n    new Date().toISOString()\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "v3jc8z594wf024z545r5q7al",
+        "position": {
+          "x": 2217.9605617863317,
+          "y": 346.95058375861083
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_History_RESOLVED",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nreturn {\n  incident_id: data.incident?.incident_id || \"\",\n\n  stage: \"RESOLVED\",\n\n  incident_status:\n    data.incident?.status || \"\",\n\n  intervention_status:\n    data.intervention?.status || \"\",\n\n  team:\n    data.intervention?.team || \"\",\n\n  city:\n    data.location?.city || \"\",\n\n  timestamp:\n    new Date().toISOString()\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "tbq1a5gjmw3mgzcfkvlx90ps",
+        "position": {
+          "x": 2322.039641325002,
+          "y": 552.6500874523539
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_History_CLOSED",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nreturn {\n  incident_id: data.incident?.incident_id || \"\",\n\n  stage: \"CLOSED\",\n\n  incident_status:\n    data.incident?.status || \"\",\n\n  intervention_status:\n    data.intervention?.status || \"\",\n\n  team:\n    data.intervention?.team || \"\",\n\n  city:\n    data.location?.city || \"\",\n\n  timestamp:\n    new Date().toISOString()\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "y717cwlc2b9wpcit8aon73mu",
+        "position": {
+          "x": 2558.420453773146,
+          "y": 329.713448021938
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_AI_Report",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// PREPARE AI INCIDENT REPORT\n// ========================================\n\nconst data = input || {};\n\nconst incident = data.incident || {};\nconst intervention = data.intervention || {};\nconst location = data.location || {};\nconst currentMonitoring = data.current_monitoring || {};\nconst recovery = data.recovery || {};\n\nconst currentRisk = currentMonitoring.risk || {};\nconst waterSensor = currentMonitoring.water_sensor || {};\nconst weather = currentMonitoring.weather || {};\nconst forecast = currentMonitoring.forecast || {};\n\nconst incidentId =\n  incident.incident_id ||\n  recovery.incident_id ||\n  \"UNKNOWN\";\n\nreturn {\n  project: data.project || \"METEO-RISK AI\",\n\n  report_type: \"AI_INCIDENT_REPORT\",\n\n  incident_id: incidentId,\n\n  final_status:\n    incident.status ||\n    data.status ||\n    \"CLOSED\",\n\n  created_at:\n    incident.created_at || null,\n\n  closed_at:\n    incident.closed_at ||\n    new Date().toISOString(),\n\n  // Filtre MongoDB dynamique prêt\n  mongo_filter: {\n    \"incident.incident_id\": incidentId\n  },\n\n  // ========================================\n  // DATA FOR AI REPORT\n  // ========================================\n\n  incident: {\n    incident_id: incidentId,\n    type: incident.type || \"\",\n    severity: incident.severity || \"\",\n    priority: incident.priority || \"\",\n    status: incident.status || \"\",\n    created_at: incident.created_at || null,\n    resolved_at: incident.resolved_at || null,\n    closed_at: incident.closed_at || null\n  },\n\n  location: {\n    city: location.city || \"\",\n    region: location.region || \"\",\n    country: location.country || \"\",\n    latitude: location.latitude || null,\n    longitude: location.longitude || null\n  },\n\n  intervention: {\n    required: intervention.required || false,\n    team: intervention.team || \"\",\n    action: intervention.action || \"\",\n    response_time: intervention.response_time || \"\",\n    status: intervention.status || \"\",\n    assigned_at: intervention.assigned_at || null,\n    started_at: intervention.started_at || null,\n    completed_at: intervention.completed_at || null\n  },\n\n  recovery: {\n    ready: recovery.ready || false,\n    water_level_cm: recovery.water_level_cm ?? null,\n    warning_level_cm: recovery.warning_level_cm ?? null,\n    risk_level: recovery.risk_level || \"\",\n    trend: recovery.trend || \"\"\n  },\n\n  current_monitoring: {\n    risk: {\n      score: currentRisk.score ?? null,\n      level: currentRisk.level || \"\",\n      alert: currentRisk.alert || false\n    },\n\n    water_sensor: {\n      previous_water_level_cm:\n        waterSensor.previous_water_level_cm ?? null,\n\n      water_level_cm:\n        waterSensor.water_level_cm ?? null,\n\n      rise_rate_cm:\n        waterSensor.rise_rate_cm ?? null,\n\n      trend:\n        waterSensor.trend || \"\",\n\n      status:\n        waterSensor.status || \"\"\n    },\n\n    weather: {\n      temperature_c:\n        weather.temperature_c ?? null,\n\n      humidity_percent:\n        weather.humidity_percent ?? null,\n\n      rain_mm:\n        weather.rain_mm ?? null,\n\n      wind_kmh:\n        weather.wind_kmh ?? null,\n\n      wind_gust_kmh:\n        weather.wind_gust_kmh ?? null,\n\n      pressure_hpa:\n        weather.pressure_hpa ?? null\n    },\n\n    forecast: {\n      next_6h_precipitation_mm:\n        forecast.next_6h_precipitation_mm ?? null,\n\n      next_6h_rain_mm:\n        forecast.next_6h_rain_mm ?? null,\n\n      max_precipitation_probability_percent:\n        forecast.max_precipitation_probability_percent ?? null\n    }\n  },\n\n  ai_report_request: {\n    objective:\n      \"Générer un rapport professionnel de clôture d'incident d'inondation.\",\n\n    language: \"fr\",\n\n    sections: [\n      \"Résumé de l'incident\",\n      \"Niveau de risque détecté\",\n      \"Conditions hydrologiques\",\n      \"Conditions météorologiques\",\n      \"Intervention réalisée\",\n      \"Évolution et récupération\",\n      \"Statut final\",\n      \"Conclusion\"\n    ]\n  }\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "rrtmd0lxq00uphh0h7gd7hfc",
+        "position": {
+          "x": 2154.507957225916,
+          "y": 247.19701979989577
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_Resolve_Update",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nreturn {\n  filter: {\n    \"incident.incident_id\": data.incident?.incident_id\n  },\n\n  update: {\n    \"incident.status\": data.incident?.status,\n    \"incident.resolved_at\": data.incident?.resolved_at,\n    \"status\": data.status,\n    \"updated_at\": new Date().toISOString()\n  }\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "jk94xhdun68fka1l2gyh21di",
+        "position": {
+          "x": 2310.9298072644615,
+          "y": 436.8731355844194
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_Close_Update",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// PREPARE CLOSE INCIDENT UPDATE\n// ========================================\n\nconst data = input || {};\n\nconst incident = data.incident || {};\n\nconst incidentId =\n  incident.incident_id ||\n  data.recovery?.incident_id ||\n  \"\";\n\nconst now =\n  new Date().toISOString();\n\nreturn {\n  filter: {\n    \"incident.incident_id\": incidentId\n  },\n\n  update: {\n    \"incident.status\": \"CLOSED\",\n    \"incident.closed_at\": now,\n\n    \"status\": \"INCIDENT_CLOSED\",\n\n    \"updated_at\": now\n  }\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "cvpncl6dga54bgr5k0johv0w",
+        "position": {
+          "x": 1458.9316795765124,
+          "y": -163.7487885514056
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Start_Intervention",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// START INTERVENTION\n// ========================================\n\nconst data = input || {};\n\nconst incident = data.incident || {};\nconst intervention = data.intervention || {};\n\nconst now = new Date().toISOString();\n\nreturn {\n  ...data,\n\n  incident: {\n    ...incident,\n    status: \"IN_PROGRESS\"\n  },\n\n  intervention: {\n    ...intervention,\n    started_at: now,\n    status: \"IN_PROGRESS\"\n  },\n\n  status: \"INTERVENTION_IN_PROGRESS\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "jc3qondxcu9vk2k4d7t2osum",
+        "position": {
+          "x": 1705.0041783182705,
+          "y": -81.11205501367607
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_History_IN_PROGRESS",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nreturn {\n  incident_id: data.incident?.incident_id || \"\",\n\n  stage: \"IN_PROGRESS\",\n\n  incident_status: data.incident?.status || \"\",\n\n  intervention_status: data.intervention?.status || \"\",\n\n  team: data.intervention?.team || \"\",\n\n  city: data.location?.city || \"\",\n\n  timestamp: new Date().toISOString()\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "zz6r8wdoik5si2wpspl0jc96",
+        "position": {
+          "x": 1661.9422900280429,
+          "y": -173.28553489289885
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_Intervention_Update",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nreturn {\n  filter: {\n    \"incident.incident_id\": data.incident?.incident_id\n  },\n\n  update: {\n    \"incident.status\": data.incident?.status,\n    \"intervention.status\": data.intervention?.status,\n    \"intervention.started_at\": data.intervention?.started_at,\n    \"status\": data.status,\n    \"updated_at\": new Date().toISOString()\n  }\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "rmj9u987ps2cr6h5um76ops8",
+        "position": {
+          "x": 1393.4338972719434,
+          "y": -417.02331091484575
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_Incident_Record",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// PREPARE INCIDENT RECORD FOR MONGODB\n// ========================================\n\nconst data = input || {};\n\nconst incident = data.incident || {};\nconst intervention = data.intervention || {};\nconst location = data.location || {};\nconst risk = data.risk || {};\nconst alertManagement = data.alert_management || {};\n\nreturn {\n  project: data.project || \"METEO-RISK AI\",\n\n  record_type: \"INCIDENT\",\n\n  incident: {\n    incident_id: incident.incident_id || \"\",\n    type: incident.type || \"\",\n    created_at: incident.created_at || \"\",\n    status: incident.status || \"OPEN\",\n    severity: incident.severity || \"UNKNOWN\",\n    priority: incident.priority || \"NORMAL\",\n    intervention_required:\n      Boolean(incident.intervention_required)\n  },\n\n  intervention: {\n    required: Boolean(intervention.required),\n    assigned_at: intervention.assigned_at || \"\",\n    team: intervention.team || \"\",\n    action: intervention.action || \"\",\n    response_time: intervention.response_time || \"\",\n    status: intervention.status || \"PENDING_INTERVENTION\"\n  },\n\n  location: {\n    city: location.city || \"\",\n    country: location.country || \"\",\n    country_code: location.country_code || \"MA\",\n    region: location.region || \"\",\n    latitude: Number(location.latitude || 0),\n    longitude: Number(location.longitude || 0),\n    timezone: location.timezone || \"Africa/Casablanca\"\n  },\n\n  risk: {\n    score: Number(risk.score || 0),\n    level: risk.level || \"UNKNOWN\",\n    alert: Boolean(risk.alert)\n  },\n\n  alert_management: alertManagement,\n\n  message: data.message || \"\",\n\n  recommendations:\n    Array.isArray(data.recommendations)\n      ? data.recommendations\n      : [],\n\n  original_timestamp:\n    data.timestamp || \"\",\n\n  saved_at:\n    new Date().toISOString()\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "smlf0nrnztg9uj4pjibx814x",
+        "position": {
+          "x": 1558.9099702627032,
+          "y": -303.45066699636055
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Create_Team_Notification",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const data = input || {};\n\nconst incident = data.incident || {};\nconst intervention = data.intervention || {};\nconst location = data.location || {};\nconst risk = data.risk || {};\n\nconst teamMessage = `🚨 METEO-RISK AI — INTERVENTION\n\n🆔 Incident : ${incident.incident_id || \"N/A\"}\n\n📍 Localisation : ${location.city || \"Inconnue\"}, ${location.country || \"Maroc\"}\n🌍 Région : ${location.region || \"Non renseignée\"}\n\n⚠️ Niveau : ${risk.level || \"UNKNOWN\"}\n📊 Score : ${risk.score || 0}/100\n🚨 Priorité : ${incident.priority || \"NORMAL\"}\n\n👷 Équipe : ${intervention.team || \"Non assignée\"}\n🎯 Action : ${intervention.action || \"Non définie\"}\n⏱️ Délai : ${intervention.response_time || \"Non défini\"}\n\n📌 Statut incident : ${incident.status || \"UNKNOWN\"}\n📌 Statut intervention : ${intervention.status || \"UNKNOWN\"}\n\n💬 Message :\n${data.message || \"Aucun message disponible.\"}`;\n\nreturn {\n  slack_text: teamMessage\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "f7ean41ryuq3i1apzup6yq3a",
+        "position": {
+          "x": 459.0351770754642,
+          "y": -126.59214784484345
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Function_Meduim",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// ACTION - MEDIUM RISK\n// ========================================\n\nconst data = input || {};\n\nconst risk = data.risk || {};\nconst location = data.location || {};\n\nreturn {\n\n  // IMPORTANT :\n  // conserver toutes les données précédentes\n  ...data,\n\n  project:\n    data.project || \"METEO-RISK AI\",\n\n  system:\n    data.system || \"AI Flood Early Warning\",\n\n  location,\n\n  timestamp:\n    data.timestamp ||\n    new Date().toISOString(),\n\n  // Conserver tout le détail du risque\n  risk: {\n    ...risk,\n\n    score:\n      Number(risk.score || 0),\n\n    level:\n      \"MEDIUM\",\n\n    alert:\n      false\n  },\n\n  action: {\n    type:\n      \"VIGILANCE\",\n\n    priority:\n      \"MEDIUM\",\n\n    intervention_required:\n      false,\n\n    notification_required:\n      true\n  },\n\n  message:\n    risk.message ||\n    data.message ||\n    \"VIGILANCE : certains indicateurs météorologiques ou hydrologiques nécessitent une surveillance renforcée.\",\n\n  recommendations:\n    Array.isArray(data.recommendations)\n      ? data.recommendations\n      : Array.isArray(data.advice)\n        ? data.advice\n        : [\n            \"Renforcer la surveillance météorologique et hydrologique.\",\n            \"Surveiller l'évolution des précipitations.\",\n            \"Contrôler régulièrement le niveau d'eau.\",\n            \"Préparer les équipes en cas d'aggravation.\",\n            \"Maintenir les zones sensibles sous surveillance.\"\n          ],\n\n  status:\n    \"ENHANCED_MONITORING\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "or5qvhu7cky9ir4l2tr1dvab",
+        "position": {
+          "x": 455.2026997634055,
+          "y": -29.21878240590995
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Function_High",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// ACTION - HIGH RISK\n// ========================================\n\nconst data = input || {};\n\nconst risk = data.risk || {};\nconst location = data.location || {};\n\nreturn {\n\n  // Conserver toutes les données précédentes\n  ...data,\n\n  project:\n    data.project || \"METEO-RISK AI\",\n\n  system:\n    data.system || \"AI Flood Early Warning\",\n\n  location,\n\n  timestamp:\n    data.timestamp ||\n    new Date().toISOString(),\n\n  risk: {\n    ...risk,\n\n    score:\n      Number(risk.score || 0),\n\n    level:\n      \"HIGH\",\n\n    alert:\n      true\n  },\n\n  action: {\n    type:\n      \"ALERT\",\n\n    priority:\n      \"HIGH\",\n\n    intervention_required:\n      true,\n\n    notification_required:\n      true\n  },\n\n  message:\n    risk.message ||\n    data.message ||\n    \"ALERTE ÉLEVÉE : risque important détecté. Une préparation opérationnelle est nécessaire.\",\n\n  recommendations:\n    Array.isArray(data.recommendations)\n      ? data.recommendations\n      : Array.isArray(data.advice)\n        ? data.advice\n        : [\n            \"Déclencher une alerte auprès des responsables.\",\n            \"Renforcer immédiatement la surveillance des zones sensibles.\",\n            \"Préparer les équipes d'intervention.\",\n            \"Vérifier la disponibilité des équipements d'intervention.\",\n            \"Surveiller continuellement l'évolution du risque.\"\n          ],\n\n  status:\n    \"INTERVENTION_PREPARATION\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "kpzr24g0m6nd0f2ije6by93j",
+        "position": {
+          "x": 455.63817039298783,
+          "y": 63.70434122050973
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Function_Critical",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// ACTION - CRITICAL RISK\n// ========================================\n\nconst data = input || {};\n\nconst risk = data.risk || {};\nconst location = data.location || {};\n\nreturn {\n\n  // Conserver toutes les données précédentes\n  ...data,\n\n  project:\n    data.project || \"METEO-RISK AI\",\n\n  system:\n    data.system || \"AI Flood Early Warning\",\n\n  location,\n\n  timestamp:\n    data.timestamp ||\n    new Date().toISOString(),\n\n  risk: {\n    ...risk,\n\n    score:\n      Number(risk.score || 0),\n\n    level:\n      \"CRITICAL\",\n\n    alert:\n      true\n  },\n\n  action: {\n    type:\n      \"EMERGENCY\",\n\n    priority:\n      \"URGENT\",\n\n    intervention_required:\n      true,\n\n    notification_required:\n      true,\n\n    escalation_required:\n      true\n  },\n\n  message:\n    risk.message ||\n    data.message ||\n    \"ALERTE CRITIQUE : risque élevé d'inondation détecté. Une intervention immédiate est recommandée.\",\n\n  recommendations:\n    Array.isArray(data.recommendations)\n      ? data.recommendations\n      : Array.isArray(data.advice)\n        ? data.advice\n        : [\n            \"Déclencher immédiatement l'alerte d'urgence.\",\n            \"Notifier les responsables opérationnels.\",\n            \"Mobiliser les équipes d'intervention.\",\n            \"Surveiller les zones critiques en continu.\",\n            \"Préparer les moyens d'évacuation si nécessaire.\",\n            \"Maintenir la situation sous surveillance jusqu'à retour à un niveau acceptable.\"\n          ],\n\n  status:\n    \"EMERGENCY_ACTIVE\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "e4sm7ocpb94b9ys2zdlg70wd",
+        "position": {
+          "x": 298.80926846072987,
+          "y": -89.35205737413344
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 86,
+        "data": {
+          "name": "switch",
+          "label": "Switch_Risk",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "LOW": {
+              "label": "LOW"
+            },
+            "MEDIUM": {
+              "label": "MEDIUM"
+            },
+            "HIGH": {
+              "label": "HIGH"
+            },
+            "CRITICAL": {
+              "label": "CRITICAL"
+            },
+            "default": {
+              "label": "default"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Routes data based on evaluated conditions",
+          "showRunningStatus": true,
+          "parameters": {
+            "conditions": [
+              {
+                "outputId": "LOW",
+                "condition": "input.risk.level == \"LOW\""
+              },
+              {
+                "outputId": "MEDIUM",
+                "condition": "input.risk.level == \"MEDIUM\""
+              },
+              {
+                "outputId": "HIGH",
+                "condition": "input.risk.level  == \"HIGH\""
+              },
+              {
+                "outputId": "CRITICAL",
+                "condition": "input.risk.level  == \"CRITICAL\""
+              }
+            ]
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "tvd6v6kcf4v2mod6lgb1jdsj",
+        "position": {
+          "x": -431.1051070032243,
+          "y": 7.119423226397977
+        },
+        "type": "trigger",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "manual-trigger",
+          "label": "Manual Trigger",
+          "inputs": {},
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Triggers the workflow manually.",
+          "showRunningStatus": false,
+          "parameters": {},
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "lqs9mcg7eiibx8bub5w1qbim",
+        "position": {
+          "x": -84.51970151788436,
+          "y": -56.71581181682335
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "merge",
+          "label": "Merge",
+          "inputs": {
+            "input1": {
+              "label": "Input1"
+            },
+            "input2": {
+              "label": "Input2"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Merges multiple inputs using zip or combineLatest strategy.",
+          "showRunningStatus": false,
+          "parameters": {
+            "strategy": "zip",
+            "mergeMode": "append"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "j1mp819bvn5nlp8ytcydrl1m",
+        "position": {
+          "x": 401.30603131638685,
+          "y": 280.4112073411029
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "merge",
+          "label": "Merge_Recovery_Data",
+          "inputs": {
+            "input1": {
+              "label": "Input1"
+            },
+            "input2": {
+              "label": "Input2"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Merges multiple inputs using zip or combineLatest strategy.",
+          "showRunningStatus": false,
+          "parameters": {
+            "strategy": "zip",
+            "mergeMode": "append"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "be29phkh0ivcvspbc3xypawq",
+        "position": {
+          "x": 31.480299473670627,
+          "y": -47.71581193043903
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "merge",
+          "label": "Merge_Flood_Data",
+          "inputs": {
+            "input1": {
+              "label": "Input1"
+            },
+            "input2": {
+              "label": "Input2"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Merges multiple inputs using zip or combineLatest strategy.",
+          "showRunningStatus": false,
+          "parameters": {
+            "strategy": "zip",
+            "mergeMode": "append"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "zowtbib4j7h58v0o65mnu3v5",
+        "position": {
+          "x": -204.2570681778816,
+          "y": 135.15918480408183
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Function_Water_Sensor",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// SIMULATED IoT WATER LEVEL SENSOR\n// ========================================\n\n// Niveau précédent\nconst previousWaterLevel = 75;\n\n// Niveau actuel\nconst waterLevel = 60;\n\n// Seuils\nconst warningLevel = 70;\nconst criticalLevel = 90;\n\n// ========================================\n// CALCUL DE LA VARIATION\n// ========================================\n\nconst riseRate =\n  waterLevel - previousWaterLevel;\n\n// ========================================\n// TENDANCE\n// ========================================\n\nlet trend = \"STABLE\";\n\nif (riseRate >= 5) {\n\n  trend = \"RISING_FAST\";\n\n} else if (riseRate > 0) {\n\n  trend = \"RISING\";\n\n} else if (riseRate < 0) {\n\n  trend = \"FALLING\";\n\n}\n\n// ========================================\n// STATUS WATER LEVEL\n// ========================================\n\nlet status = \"NORMAL\";\n\nif (waterLevel >= criticalLevel) {\n\n  status = \"CRITICAL\";\n\n} else if (waterLevel >= warningLevel) {\n\n  status = \"WARNING\";\n\n}\n\n// ========================================\n// OUTPUT\n// ========================================\n\nreturn {\n  sensor: {\n\n    sensor_id: \"WL-CASA-001\",\n\n    type: \"WATER_LEVEL\",\n\n    city: \"Casablanca\",\n\n    previous_water_level_cm:\n      previousWaterLevel,\n\n    water_level_cm:\n      waterLevel,\n\n    rise_rate_cm:\n      riseRate,\n\n    trend:\n      trend,\n\n    warning_level_cm:\n      warningLevel,\n\n    critical_level_cm:\n      criticalLevel,\n\n    status:\n      status,\n\n    timestamp:\n      new Date().toISOString(),\n\n    data_source:\n      \"SIMULATED_IOT_TEST\"\n  }\n};"
+          },
+          "_morphing": false
+        },
+        "selected": true
+      },
+      {
+        "id": "qgbynyr3rzhiz1olimst4ixc",
+        "position": {
+          "x": 817.1682259442241,
+          "y": -230.9913149376832
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 68,
+        "data": {
+          "name": "if-else",
+          "label": "If-Else",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True"
+            },
+            "false": {
+              "label": "False"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes different branches based on a condition",
+          "showRunningStatus": false,
+          "parameters": {
+            "condition": "input.alert_management.notification_required === true"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "t0bqhi5eq62mqs9cespgk2ml",
+        "position": {
+          "x": 758.490258932342,
+          "y": 179.63788970025666
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 68,
+        "data": {
+          "name": "if-else",
+          "label": "IF_Recovery",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True"
+            },
+            "false": {
+              "label": "False"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes different branches based on a condition",
+          "showRunningStatus": false,
+          "parameters": {
+            "condition": "input.recovery.ready === true"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "kv48hgylyido3rd7ywwy5arn",
+        "position": {
+          "x": 1102.3844102455193,
+          "y": -137.30924955693592
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 68,
+        "data": {
+          "name": "if-else",
+          "label": "If-Else1",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True"
+            },
+            "false": {
+              "label": "False"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes different branches based on a condition",
+          "showRunningStatus": false,
+          "parameters": {
+            "condition": "input.incident.intervention_required === true"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "lo1n225827wsv665kyznpb47",
+        "position": {
+          "x": 1143.8882156753373,
+          "y": -249.79688220967915
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "gmail",
+          "label": "Gmail",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Consolidated Gmail operations (send/get/trash/delete/move/markRead/markUnread/createLabel/listLabels)",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "send",
+            "bodyType": "html",
+            "to": [
+              "ayoubabdelmoughit75@gmail.com"
+            ],
+            "clientId": {
+              "$expr": "secret",
+              "path": "ci"
+            },
+            "clientSecret": {
+              "$expr": "secret",
+              "path": "cs"
+            },
+            "refreshToken": "YOUR_TOKEN",
+            "html": {
+              "$expr": "output",
+              "node": "Create_Alert_Message",
+              "outputId": "success",
+              "path": "message"
+            },
+            "subject": {
+              "$expr": "output",
+              "node": "Create_Alert_Message",
+              "outputId": "success",
+              "path": "subject"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "a5rjomo37p3ptgzr7lk95kjl",
+        "position": {
+          "x": 924.7402808793727,
+          "y": -22.306272544533314
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "MongoDB Action",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Insert One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Risk",
+            "insertOneData": {
+              "$expr": "output",
+              "node": "Prepare_MongoDB_Record",
+              "outputId": "success"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "now7zv0jtn2u9sdybl9n0unv",
+        "position": {
+          "x": 1601.8384125857767,
+          "y": -424.1279588083554
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "data_Incident",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Insert One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incidents",
+            "insertOneData": {
+              "$expr": "output",
+              "node": "Prepare_Incident_Record",
+              "outputId": "success"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "lngdsjjdakbllfkht8yroh4g",
+        "position": {
+          "x": 1842.5452797925593,
+          "y": -179.21661340250319
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "PROGRESS",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Update One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incidents",
+            "updateOneParams": {
+              "filter": {
+                "$expr": "output",
+                "node": "Prepare_Intervention_Update",
+                "outputId": "success",
+                "path": "filter"
+              },
+              "update": {
+                "$expr": "output",
+                "node": "Prepare_Intervention_Update",
+                "outputId": "success",
+                "path": "update"
+              }
+            },
+            "acknowledgeRisk": true
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "ur91nhz2m4xue4t9avtthd6q",
+        "position": {
+          "x": 6.863842593615274,
+          "y": 265.46590469938855
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Find_Active_Incident",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Find One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incidents",
+            "acknowledgeRisk": true,
+            "findOneParams": {
+              "filter": {
+                "incident.status": "IN_PROGRESS"
+              }
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "efd5ufaksfw6l2nk3udurphh",
+        "position": {
+          "x": 1963.5411621036183,
+          "y": -92.84456057131709
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "HISTORY_PROGRESS",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Insert One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incident_History",
+            "acknowledgeRisk": true,
+            "insertOneData": {
+              "$expr": "output",
+              "node": "Prepare_History_IN_PROGRESS",
+              "outputId": "success"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "uufbhp8lbnoiqm9jlah6juu6",
+        "position": {
+          "x": 2152.547035430451,
+          "y": 29.77467787645027
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Complet",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Update One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incidents",
+            "updateOneParams": {
+              "filter": "[[  outputs.Prepare_Completion_Update.success.filter ]]",
+              "update": {
+                "$expr": "output",
+                "node": "Prepare_Completion_Update",
+                "outputId": "success",
+                "path": "update"
+              }
+            },
+            "acknowledgeRisk": true
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "qzsg7dzqv2sc78h31etk1uyl",
+        "position": {
+          "x": 2151.0446504406855,
+          "y": 142.3735801036254
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Complet_History",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Insert One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incident_History",
+            "acknowledgeRisk": true,
+            "insertOneData": {
+              "$expr": "output",
+              "node": "Prepare_History_COMPLETED",
+              "outputId": "success"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "n3jmndyn2deku0akbzp7gezk",
+        "position": {
+          "x": 2331.5899780474315,
+          "y": 339.04256100237416
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Resolve_History",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Insert One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incident_History",
+            "acknowledgeRisk": true,
+            "insertOneData": {
+              "$expr": "output",
+              "node": "Prepare_History_RESOLVED",
+              "outputId": "success"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "i4k03vf404n2tr4q0wap6789",
+        "position": {
+          "x": 2995.3182713023025,
+          "y": 473.58821950668073
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Meteo_AI_Reports",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Insert One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_AI_Reports",
+            "acknowledgeRisk": true,
+            "insertOneData": {
+              "$expr": "output",
+              "node": "Prepare_Report_Save",
+              "outputId": "success"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "gtfjf1hxoby8guzvp093k385",
+        "position": {
+          "x": 2458.6326431389816,
+          "y": 552.8866060875057
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Closed_History",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Insert One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incident_History",
+            "acknowledgeRisk": true,
+            "insertOneData": {
+              "$expr": "output",
+              "node": "Prepare_History_CLOSED",
+              "outputId": "success"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "bhxb190zdytxldbx4rzs23dv",
+        "position": {
+          "x": 2279.72722166019,
+          "y": 242.11572329817426
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Resolve",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Update One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incidents",
+            "updateOneParams": {
+              "filter": {
+                "$expr": "output",
+                "node": "Prepare_Resolve_Update",
+                "outputId": "success",
+                "path": "filter"
+              },
+              "update": {
+                "$expr": "output",
+                "node": "Prepare_Resolve_Update",
+                "outputId": "success",
+                "path": "update"
+              }
+            },
+            "acknowledgeRisk": true
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "o6h8ir0gasva4dm9v0bmpheb",
+        "position": {
+          "x": 2466.850547201741,
+          "y": 436.54179303551274
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "mongodb-action",
+          "label": "Close",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Execute MongoDB operations — find, insert, update, delete, aggregate",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "Update One",
+            "uri": "mongodb+srv://ayoubabdelmoughit75_db_user:gxl2vJVaC2was3fC@ayoub.eknyomo.mongodb.net/?appName=ayoub",
+            "database": "Meteo",
+            "collection": "Meteo_Incidents",
+            "updateOneParams": {
+              "filter": {
+                "$expr": "output",
+                "node": "Prepare_Close_Update",
+                "outputId": "success",
+                "path": "filter"
+              },
+              "update": {
+                "$expr": "output",
+                "node": "Prepare_Close_Update",
+                "outputId": "success",
+                "path": "update"
+              }
+            },
+            "acknowledgeRisk": true
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "loopp8t00xl5wibdh6gw2xfx",
+        "position": {
+          "x": 1731.7080171216346,
+          "y": -316.4642351253606
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "slack-action",
+          "label": "Slack Action",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Perform Slack operations",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "message",
+            "token": "YOUR_TOKEN",
+            "messageOperation": "send",
+            "text": {
+              "$expr": "output",
+              "node": "Create_Team_Notification",
+              "outputId": "success",
+              "path": "slack_text"
+            },
+            "messageChannelId": "C0BQ5BX7212"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "zxeuy1aaiggnr7g9cuuv50y4",
+        "position": {
+          "x": 3038.27953578197,
+          "y": 601.6131386845989
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "slack-action",
+          "label": "slack_final",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Perform Slack operations",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "message",
+            "token": "YOUR_TOKEN",
+            "messageOperation": "send",
+            "text": {
+              "$expr": "output",
+              "node": "Prepare_Final_Notification",
+              "outputId": "success",
+              "path": "slack_message"
+            },
+            "messageChannelId": "C0BQ5BX7212"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "cuts4oht4cxdj9c16ehx673i",
+        "position": {
+          "x": 193.32742943692068,
+          "y": 267.18577872643175
+        },
+        "type": "utility",
+        "width": 64,
+        "height": 68,
+        "data": {
+          "name": "if-else",
+          "label": "IF_Active_Incident",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "true": {
+              "label": "True"
+            },
+            "false": {
+              "label": "False"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes different branches based on a condition",
+          "showRunningStatus": false,
+          "parameters": {
+            "condition": "input?.incident?.status === \"IN_PROGRESS\""
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "pww2xmdluxcas2znqkfpixqi",
+        "position": {
+          "x": 2697.096129296805,
+          "y": 488.9595161755851
+        },
+        "type": "agent",
+        "width": 96,
+        "height": 96,
+        "data": {
+          "name": "agent",
+          "label": "Agent",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "An AI agent that can perform tasks using nodes as tools based on user input.",
+          "showRunningStatus": true,
+          "parameters": {
+            "systemPrompt": "Tu es un assistant expert en gestion des risques météorologiques et hydrologiques.\n\nÀ partir des données reçues, génère un rapport professionnel de clôture d'incident d'inondation pour le système METEO-RISK AI.\n\nRègles :\n- Utilise uniquement les données fournies.\n- N'invente aucune information.\n- Ne modifie aucun chiffre.\n- Rédige en français professionnel.\n- Le rapport doit être clair, structuré et concis.\n- Mentionne explicitement l'évolution entre la situation critique initiale et la phase de récupération.\n- Explique que l'incident est clôturé uniquement parce que les critères de récupération ont été confirmés.\n- Si une donnée manque, ne l'invente pas.\n\nStructure obligatoire :\n\n# Rapport de clôture d'incident — METEO-RISK AI\n\n## 1. Identification de l'incident\n- ID incident\n- Type\n- Localisation\n- Niveau de sévérité\n- Priorité\n- Date de création\n- Date de résolution\n- Date de clôture\n\n## 2. Résumé de l'incident\nPrésente brièvement la situation détectée et le niveau de risque initial.\n\n## 3. Intervention\nIndique :\n- l'équipe mobilisée ;\n- l'action réalisée ;\n- le statut de l'intervention ;\n- les dates d'assignation, de début et de fin.\n\n## 4. Phase de récupération\nIndique :\n- niveau d'eau actuel ;\n- seuil de vigilance ;\n- tendance ;\n- niveau de risque actuel ;\n- état du capteur ;\n- variation du niveau d'eau.\n\nExplique pourquoi les conditions de récupération sont considérées comme satisfaites.\n\n## 5. Conditions météorologiques au moment de la récupération\nPrésente :\n- température ;\n- humidité ;\n- pluie ;\n- vent ;\n- rafales ;\n- pression ;\n- prévisions de précipitations sur 6 heures.\n\n## 6. Statut final\nIndique clairement le statut final de l'incident.\n\n## 7. Conclusion\nRésume le retour à une situation normale et la clôture de l'incident.\n\nRetourne uniquement le rapport final, sans JSON, sans explication supplémentaire.",
+            "threadId": "[[ input.incident_id ]]"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "lixxujux4pnc5vi183hy7vut",
+        "position": {
+          "x": 2736.4927090780334,
+          "y": 708.896410943941
+        },
+        "type": "agent-llm",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "groq-llm",
+          "label": "Groq LLM",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "A node that uses Groq's ultra-fast LLM inference.",
+          "showRunningStatus": true,
+          "parameters": {
+            "temperature": 0.1,
+            "maxTokens": 1800,
+            "timeout": 60000,
+            "apiKey": "YOUR_API_KEY"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "n2xmqpg6gu33pav6zbvgudem",
+        "position": {
+          "x": 2861.6743429580265,
+          "y": 482.3964127892107
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_Report_Save",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "// ========================================\n// METEO-RISK AI\n// PREPARE AI REPORT FOR MONGODB\n// ========================================\n\nconst now = new Date().toISOString();\n\n// Agent كيرجع التقرير كنص مباشر\nconst report =\n  typeof input === \"string\"\n    ? input\n    : (\n        input?.output ||\n        input?.text ||\n        input?.response ||\n        input?.result ||\n        \"\"\n      );\n\n// نستخرج Incident ID من التقرير\nconst incidentMatch =\n  report.match(/INC-\\d+/);\n\nconst incidentId =\n  incidentMatch\n    ? incidentMatch[0]\n    : \"UNKNOWN\";\n\nreturn {\n  project: \"METEO-RISK AI\",\n\n  record_type: \"AI_INCIDENT_REPORT\",\n\n  incident_id: incidentId,\n\n  report: report,\n\n  generated_at: now,\n\n  status: \"REPORT_GENERATED\"\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "wc3e99x2ntwtik1f9fab9c0r",
+        "position": {
+          "x": 2862.8411394520926,
+          "y": 650.5555126156145
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "function",
+          "label": "Prepare_Final_Notification",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Executes custom JavaScript code on the input data.",
+          "showRunningStatus": true,
+          "parameters": {
+            "code": "const report =\n  typeof input === \"string\"\n    ? input\n    : (\n        input?.output ||\n        input?.text ||\n        input?.response ||\n        input?.result ||\n        \"\"\n      );\n\n\n// ========================================\n// INCIDENT ID\n// ========================================\n\nconst incidentMatch =\n  report.match(/INC-\\d+/);\n\nconst incidentId =\n  incidentMatch\n    ? incidentMatch[0]\n    : \"UNKNOWN\";\n\nconst now =\n  new Date().toISOString();\n\n\n// ========================================\n// CONVERT REPORT TO SIMPLE HTML\n// ========================================\n\nfunction escapeHtml(text) {\n  return String(text)\n    .replace(/&/g, \"&amp;\")\n    .replace(/</g, \"&lt;\")\n    .replace(/>/g, \"&gt;\");\n}\n\nfunction reportToHtml(markdown) {\n\n  return escapeHtml(markdown)\n    .split(\"\\n\")\n    .map(line => {\n\n      const text = line.trim();\n\n      if (!text) {\n        return `<div style=\"height:10px;\"></div>`;\n      }\n\n      // TITLE\n      if (text.startsWith(\"# \")) {\n\n        return `\n          <h2 style=\"\n            color:#0d47a1;\n            margin:20px 0 15px 0;\n          \">\n            ${text.substring(2)}\n          </h2>\n        `;\n      }\n\n      // SECTION\n      if (text.startsWith(\"## \")) {\n\n        return `\n          <h3 style=\"\n            color:#1565c0;\n            margin:22px 0 10px 0;\n            border-bottom:1px solid #dddddd;\n            padding-bottom:6px;\n          \">\n            ${text.substring(3)}\n          </h3>\n        `;\n      }\n\n      // LIST\n      if (text.startsWith(\"- \")) {\n\n        return `\n          <div style=\"\n            margin:6px 0;\n            padding-left:15px;\n          \">\n            • ${text.substring(2)}\n          </div>\n        `;\n      }\n\n      // NORMAL PARAGRAPH\n      return `\n        <p style=\"\n          margin:8px 0;\n          line-height:1.6;\n        \">\n          ${text}\n        </p>\n      `;\n    })\n    .join(\"\");\n}\n\nconst reportHtml =\n  reportToHtml(report);\n\n\n// ========================================\n// OUTPUT\n// ========================================\n\nreturn {\n\n  project:\n    \"METEO-RISK AI\",\n\n  notification_type:\n    \"INCIDENT_CLOSED_REPORT\",\n\n  incident_id:\n    incidentId,\n\n  status:\n    \"REPORT_GENERATED\",\n\n  generated_at:\n    now,\n\n  report:\n    report,\n\n\n  // ========================================\n  // SLACK\n  // ========================================\n\n  slack_message:\n`✅ METEO-RISK AI — Incident clôturé\n\n🆔 Incident : ${incidentId}\n📊 Statut : REPORT_GENERATED\n🤖 Rapport IA généré avec succès.\n\nLa situation est revenue à un niveau normal.`,\n\n\n  // ========================================\n  // EMAIL SUBJECT\n  // ========================================\n\n  email_subject:\n    `METEO-RISK AI | Rapport incident ${incidentId}`,\n\n\n  // ========================================\n  // EMAIL HTML\n  // ========================================\n\n  email_html:\n`\n<div style=\"\n  font-family:Arial,Helvetica,sans-serif;\n  max-width:850px;\n  margin:auto;\n  color:#222222;\n\">\n\n  <div style=\"\n    background:#0d47a1;\n    color:white;\n    padding:22px;\n    border-radius:8px 8px 0 0;\n  \">\n\n    <h1 style=\"\n      margin:0;\n      font-size:24px;\n    \">\n      🌊 METEO-RISK AI\n    </h1>\n\n    <p style=\"\n      margin:7px 0 0 0;\n    \">\n      Rapport automatique de clôture d'incident\n    </p>\n\n  </div>\n\n\n  <div style=\"\n    padding:20px;\n    border:1px solid #dddddd;\n  \">\n\n    <h2 style=\"\n      color:#198754;\n      margin-top:0;\n    \">\n      ✅ Incident clôturé\n    </h2>\n\n\n    <table style=\"\n      width:100%;\n      border-collapse:collapse;\n      margin-bottom:25px;\n    \">\n\n      <tr>\n\n        <td style=\"\n          padding:10px;\n          background:#f5f5f5;\n          font-weight:bold;\n        \">\n          Incident ID\n        </td>\n\n        <td style=\"\n          padding:10px;\n          background:#f5f5f5;\n        \">\n          ${incidentId}\n        </td>\n\n      </tr>\n\n\n      <tr>\n\n        <td style=\"\n          padding:10px;\n          font-weight:bold;\n        \">\n          Statut\n        </td>\n\n        <td style=\"\n          padding:10px;\n          color:#198754;\n          font-weight:bold;\n        \">\n          REPORT_GENERATED\n        </td>\n\n      </tr>\n\n\n      <tr>\n\n        <td style=\"\n          padding:10px;\n          background:#f5f5f5;\n          font-weight:bold;\n        \">\n          Date\n        </td>\n\n        <td style=\"\n          padding:10px;\n          background:#f5f5f5;\n        \">\n          ${now}\n        </td>\n\n      </tr>\n\n    </table>\n\n\n    <div style=\"\n      background:#e8f5e9;\n      border-left:5px solid #198754;\n      padding:15px;\n      margin-bottom:25px;\n    \">\n\n      <strong>\n        Situation revenue à la normale\n      </strong>\n\n      <p style=\"\n        margin:5px 0 0 0;\n      \">\n        L'incident a été clôturé et le rapport IA\n        a été généré avec succès.\n      </p>\n\n    </div>\n\n\n    <div style=\"\n      border-top:2px solid #0d47a1;\n      padding-top:10px;\n    \">\n\n      ${reportHtml}\n\n    </div>\n\n  </div>\n\n\n  <div style=\"\n    background:#f5f5f5;\n    padding:15px;\n    text-align:center;\n    color:#666666;\n    font-size:12px;\n    border-radius:0 0 8px 8px;\n  \">\n\n    METEO-RISK AI<br>\n    Flood Early Warning & Incident Management\n\n  </div>\n\n</div>\n`\n};"
+          },
+          "_morphing": false
+        },
+        "selected": false
+      },
+      {
+        "id": "sh98lphx81p0y83tib1e13ee",
+        "position": {
+          "x": 3042.6898552449684,
+          "y": 717.1545016808304
+        },
+        "type": "action",
+        "width": 64,
+        "height": 64,
+        "data": {
+          "name": "gmail",
+          "label": "Gmail_final",
+          "inputs": {
+            "input": {
+              "label": "Input"
+            }
+          },
+          "outputs": {
+            "success": {
+              "label": "Success"
+            },
+            "error": {
+              "label": "Error"
+            }
+          },
+          "description": "Consolidated Gmail operations (send/get/trash/delete/move/markRead/markUnread/createLabel/listLabels)",
+          "showRunningStatus": true,
+          "parameters": {
+            "operation": "send",
+            "bodyType": "html",
+            "to": [
+              "ayoubabdelmoughit75@gmail.com"
+            ],
+            "clientId": {
+              "$expr": "secret",
+              "path": "ci"
+            },
+            "clientSecret": {
+              "$expr": "secret",
+              "path": "cs"
+            },
+            "refreshToken": "YOUR_TOKEN",
+            "html": {
+              "$expr": "output",
+              "node": "Prepare_Final_Notification",
+              "outputId": "success",
+              "path": "email_html"
+            },
+            "subject": {
+              "$expr": "output",
+              "node": "Prepare_Final_Notification",
+              "outputId": "success",
+              "path": "email_subject"
+            }
+          },
+          "_morphing": false
+        },
+        "selected": false
+      }
+    ],
+    "connections": [
+      {
+        "source": "450ef761-db6a-4be5-b31b-6658e7249501",
+        "sourceHandle": "success",
+        "target": "d5662d7f-592c-4cf1-bc3a-7148c1d88d48",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__tlna8f94d17e8m8o8eboc6p7success-aubjmp089i5xv005rluzhdyminput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "450ef761-db6a-4be5-b31b-6658e7249501",
+        "sourceHandle": "success",
+        "target": "mieqng4loq1woljv21mplxbk",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__450ef761-db6a-4be5-b31b-6658e7249501success-mieqng4loq1woljv21mplxbkinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "tvd6v6kcf4v2mod6lgb1jdsj",
+        "sourceHandle": "success",
+        "target": "b9d49f41-e701-49cc-8084-6f036836af1c",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__tvd6v6kcf4v2mod6lgb1jdsjsuccess-b9d49f41-e701-49cc-8084-6f036836af1cinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "e4sm7ocpb94b9ys2zdlg70wd",
+        "sourceHandle": "LOW",
+        "target": "q5x4dnm40c7yj91xev5b99x6",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__e4sm7ocpb94b9ys2zdlg70wdLOW-q5x4dnm40c7yj91xev5b99x6input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "b9d49f41-e701-49cc-8084-6f036836af1c",
+        "sourceHandle": "success",
+        "target": "lqs9mcg7eiibx8bub5w1qbim",
+        "targetHandle": "input1",
+        "type": "directed",
+        "id": "xy-edge__b9d49f41-e701-49cc-8084-6f036836af1csuccess-lqs9mcg7eiibx8bub5w1qbiminput1",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "fz0nt7olyassi2sqqp8oia8i",
+        "sourceHandle": "success",
+        "target": "lqs9mcg7eiibx8bub5w1qbim",
+        "targetHandle": "input2",
+        "type": "directed",
+        "id": "xy-edge__fz0nt7olyassi2sqqp8oia8isuccess-lqs9mcg7eiibx8bub5w1qbiminput2",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "e4sm7ocpb94b9ys2zdlg70wd",
+        "sourceHandle": "MEDIUM",
+        "target": "f7ean41ryuq3i1apzup6yq3a",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__e4sm7ocpb94b9ys2zdlg70wdMEDIUM-f7ean41ryuq3i1apzup6yq3ainput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "e4sm7ocpb94b9ys2zdlg70wd",
+        "sourceHandle": "HIGH",
+        "target": "or5qvhu7cky9ir4l2tr1dvab",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__e4sm7ocpb94b9ys2zdlg70wdHIGH-or5qvhu7cky9ir4l2tr1dvabinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "e4sm7ocpb94b9ys2zdlg70wd",
+        "sourceHandle": "CRITICAL",
+        "target": "kpzr24g0m6nd0f2ije6by93j",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__e4sm7ocpb94b9ys2zdlg70wdCRITICAL-kpzr24g0m6nd0f2ije6by93jinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "s9bfti5ucvd2567f09ep7t16",
+        "sourceHandle": "success",
+        "target": "ftpta2a2fv9vk5ux9skl8c49",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__s9bfti5ucvd2567f09ep7t16success-ftpta2a2fv9vk5ux9skl8c49input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "ftpta2a2fv9vk5ux9skl8c49",
+        "sourceHandle": "success",
+        "target": "e4sm7ocpb94b9ys2zdlg70wd",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__ftpta2a2fv9vk5ux9skl8c49success-e4sm7ocpb94b9ys2zdlg70wdinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "q5x4dnm40c7yj91xev5b99x6",
+        "sourceHandle": "success",
+        "target": "m7tkjvg82hug4shcsqjwclnz",
+        "targetHandle": "input1",
+        "type": "directed",
+        "id": "xy-edge__q5x4dnm40c7yj91xev5b99x6success-m7tkjvg82hug4shcsqjwclnzinput1",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "f7ean41ryuq3i1apzup6yq3a",
+        "sourceHandle": "success",
+        "target": "m7tkjvg82hug4shcsqjwclnz",
+        "targetHandle": "input2",
+        "type": "directed",
+        "id": "xy-edge__f7ean41ryuq3i1apzup6yq3asuccess-m7tkjvg82hug4shcsqjwclnzinput2",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "or5qvhu7cky9ir4l2tr1dvab",
+        "sourceHandle": "success",
+        "target": "m7tkjvg82hug4shcsqjwclnz",
+        "targetHandle": "input3",
+        "type": "directed",
+        "id": "xy-edge__or5qvhu7cky9ir4l2tr1dvabsuccess-m7tkjvg82hug4shcsqjwclnzinput3",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "kpzr24g0m6nd0f2ije6by93j",
+        "sourceHandle": "success",
+        "target": "m7tkjvg82hug4shcsqjwclnz",
+        "targetHandle": "input4",
+        "type": "directed",
+        "id": "xy-edge__kpzr24g0m6nd0f2ije6by93jsuccess-m7tkjvg82hug4shcsqjwclnzinput4",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "m7tkjvg82hug4shcsqjwclnz",
+        "sourceHandle": "success",
+        "target": "qedvgqa30k7o19lt8qyazkyj",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__m7tkjvg82hug4shcsqjwclnzsuccess-qedvgqa30k7o19lt8qyazkyjinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "f7ean41ryuq3i1apzup6yq3a",
+        "sourceHandle": "success",
+        "target": "m7tkjvg82hug4shcsqjwclnz",
+        "targetHandle": "input1",
+        "type": "directed",
+        "id": "xy-edge__f7ean41ryuq3i1apzup6yq3asuccess-m7tkjvg82hug4shcsqjwclnzinput1",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "or5qvhu7cky9ir4l2tr1dvab",
+        "sourceHandle": "success",
+        "target": "m7tkjvg82hug4shcsqjwclnz",
+        "targetHandle": "input1",
+        "type": "directed",
+        "id": "xy-edge__or5qvhu7cky9ir4l2tr1dvabsuccess-m7tkjvg82hug4shcsqjwclnzinput1",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "kpzr24g0m6nd0f2ije6by93j",
+        "sourceHandle": "success",
+        "target": "qedvgqa30k7o19lt8qyazkyj",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__kpzr24g0m6nd0f2ije6by93jsuccess-qedvgqa30k7o19lt8qyazkyjinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "or5qvhu7cky9ir4l2tr1dvab",
+        "sourceHandle": "success",
+        "target": "qedvgqa30k7o19lt8qyazkyj",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__or5qvhu7cky9ir4l2tr1dvabsuccess-qedvgqa30k7o19lt8qyazkyjinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "f7ean41ryuq3i1apzup6yq3a",
+        "sourceHandle": "success",
+        "target": "qedvgqa30k7o19lt8qyazkyj",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__f7ean41ryuq3i1apzup6yq3asuccess-qedvgqa30k7o19lt8qyazkyjinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "q5x4dnm40c7yj91xev5b99x6",
+        "sourceHandle": "success",
+        "target": "qedvgqa30k7o19lt8qyazkyj",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__q5x4dnm40c7yj91xev5b99x6success-qedvgqa30k7o19lt8qyazkyjinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "qedvgqa30k7o19lt8qyazkyj",
+        "sourceHandle": "success",
+        "target": "qgbynyr3rzhiz1olimst4ixc",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__qedvgqa30k7o19lt8qyazkyjsuccess-qgbynyr3rzhiz1olimst4ixcinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "qgbynyr3rzhiz1olimst4ixc",
+        "sourceHandle": "true",
+        "target": "th21yjbmne1o3xpk1liramfc",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__qgbynyr3rzhiz1olimst4ixctrue-th21yjbmne1o3xpk1liramfcinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "th21yjbmne1o3xpk1liramfc",
+        "sourceHandle": "success",
+        "target": "lo1n225827wsv665kyznpb47",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__th21yjbmne1o3xpk1liramfcsuccess-lo1n225827wsv665kyznpb47input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "nuqkq4kc6jweds33y6c356km",
+        "sourceHandle": "success",
+        "target": "a5rjomo37p3ptgzr7lk95kjl",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__nuqkq4kc6jweds33y6c356kmsuccess-a5rjomo37p3ptgzr7lk95kjlinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "qedvgqa30k7o19lt8qyazkyj",
+        "sourceHandle": "success",
+        "target": "nuqkq4kc6jweds33y6c356km",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__qedvgqa30k7o19lt8qyazkyjsuccess-nuqkq4kc6jweds33y6c356kminput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "qgbynyr3rzhiz1olimst4ixc",
+        "sourceHandle": "true",
+        "target": "vlnvaj6rue0iaeh4xezv5jyu",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__qgbynyr3rzhiz1olimst4ixctrue-vlnvaj6rue0iaeh4xezv5jyuinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "vlnvaj6rue0iaeh4xezv5jyu",
+        "sourceHandle": "success",
+        "target": "kv48hgylyido3rd7ywwy5arn",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__vlnvaj6rue0iaeh4xezv5jyusuccess-kv48hgylyido3rd7ywwy5arninput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "kv48hgylyido3rd7ywwy5arn",
+        "sourceHandle": "true",
+        "target": "h0l71zm3l0ci6ooy3lgo55xj",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__kv48hgylyido3rd7ywwy5arntrue-h0l71zm3l0ci6ooy3lgo55xjinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "h0l71zm3l0ci6ooy3lgo55xj",
+        "sourceHandle": "success",
+        "target": "rmj9u987ps2cr6h5um76ops8",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__h0l71zm3l0ci6ooy3lgo55xjsuccess-rmj9u987ps2cr6h5um76ops8input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "rmj9u987ps2cr6h5um76ops8",
+        "sourceHandle": "success",
+        "target": "now7zv0jtn2u9sdybl9n0unv",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__rmj9u987ps2cr6h5um76ops8success-now7zv0jtn2u9sdybl9n0unvinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "rmj9u987ps2cr6h5um76ops8",
+        "sourceHandle": "success",
+        "target": "smlf0nrnztg9uj4pjibx814x",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__rmj9u987ps2cr6h5um76ops8success-smlf0nrnztg9uj4pjibx814xinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "smlf0nrnztg9uj4pjibx814x",
+        "sourceHandle": "success",
+        "target": "loopp8t00xl5wibdh6gw2xfx",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__smlf0nrnztg9uj4pjibx814xsuccess-loopp8t00xl5wibdh6gw2xfxinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "zz6r8wdoik5si2wpspl0jc96",
+        "sourceHandle": "success",
+        "target": "lngdsjjdakbllfkht8yroh4g",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__zz6r8wdoik5si2wpspl0jc96success-lngdsjjdakbllfkht8yroh4ginput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "jqqvryi685gsgvt4b3azbuv4",
+        "sourceHandle": "success",
+        "target": "vm75g1yr0gxnw8mq8sivf4qh",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__jqqvryi685gsgvt4b3azbuv4success-vm75g1yr0gxnw8mq8sivf4qhinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "erjolmw5de2fo6pk21kg7ldb",
+        "sourceHandle": "success",
+        "target": "x3a99xzpbdpjlb106c4mw5s7",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__erjolmw5de2fo6pk21kg7ldbsuccess-x3a99xzpbdpjlb106c4mw5s7input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "x3a99xzpbdpjlb106c4mw5s7",
+        "sourceHandle": "success",
+        "target": "uufbhp8lbnoiqm9jlah6juu6",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__x3a99xzpbdpjlb106c4mw5s7success-uufbhp8lbnoiqm9jlah6juu6input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "tra5ewr3morlzd2vkf7zcizx",
+        "sourceHandle": "success",
+        "target": "rocqdihfa4qm3o1cugdh4efc",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__tra5ewr3morlzd2vkf7zcizxsuccess-rocqdihfa4qm3o1cugdh4efcinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "nc273cl1e5p5aw7jnpjjacff",
+        "sourceHandle": "success",
+        "target": "tghxnayvsaibxfn523mjvktq",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__nc273cl1e5p5aw7jnpjjacffsuccess-tghxnayvsaibxfn523mjvktqinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "sjfc32lir3jcm6uc9htih7nz",
+        "sourceHandle": "success",
+        "target": "rrtmd0lxq00uphh0h7gd7hfc",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__sjfc32lir3jcm6uc9htih7nzsuccess-rrtmd0lxq00uphh0h7gd7hfcinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "rrtmd0lxq00uphh0h7gd7hfc",
+        "sourceHandle": "success",
+        "target": "bhxb190zdytxldbx4rzs23dv",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__rrtmd0lxq00uphh0h7gd7hfcsuccess-bhxb190zdytxldbx4rzs23dvinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "cvpncl6dga54bgr5k0johv0w",
+        "sourceHandle": "success",
+        "target": "zz6r8wdoik5si2wpspl0jc96",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__cvpncl6dga54bgr5k0johv0wsuccess-zz6r8wdoik5si2wpspl0jc96input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "h0l71zm3l0ci6ooy3lgo55xj",
+        "sourceHandle": "success",
+        "target": "cvpncl6dga54bgr5k0johv0w",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__h0l71zm3l0ci6ooy3lgo55xjsuccess-cvpncl6dga54bgr5k0johv0winput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "jc3qondxcu9vk2k4d7t2osum",
+        "sourceHandle": "success",
+        "target": "efd5ufaksfw6l2nk3udurphh",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__jc3qondxcu9vk2k4d7t2osumsuccess-efd5ufaksfw6l2nk3udurphhinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "erjolmw5de2fo6pk21kg7ldb",
+        "sourceHandle": "success",
+        "target": "cg3p6a66kaghkhji647hfcgc",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__erjolmw5de2fo6pk21kg7ldbsuccess-cg3p6a66kaghkhji647hfcgcinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "cg3p6a66kaghkhji647hfcgc",
+        "sourceHandle": "success",
+        "target": "qzsg7dzqv2sc78h31etk1uyl",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__cg3p6a66kaghkhji647hfcgcsuccess-qzsg7dzqv2sc78h31etk1uylinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "sjfc32lir3jcm6uc9htih7nz",
+        "sourceHandle": "success",
+        "target": "v3jc8z594wf024z545r5q7al",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__sjfc32lir3jcm6uc9htih7nzsuccess-v3jc8z594wf024z545r5q7alinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "v3jc8z594wf024z545r5q7al",
+        "sourceHandle": "success",
+        "target": "n3jmndyn2deku0akbzp7gezk",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__v3jc8z594wf024z545r5q7alsuccess-n3jmndyn2deku0akbzp7gezkinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "sjfc32lir3jcm6uc9htih7nz",
+        "sourceHandle": "success",
+        "target": "lnwrr6tkfyd0bqdhi3jix6dp",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__sjfc32lir3jcm6uc9htih7nzsuccess-lnwrr6tkfyd0bqdhi3jix6dpinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "lnwrr6tkfyd0bqdhi3jix6dp",
+        "sourceHandle": "success",
+        "target": "jk94xhdun68fka1l2gyh21di",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__lnwrr6tkfyd0bqdhi3jix6dpsuccess-jk94xhdun68fka1l2gyh21diinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "jk94xhdun68fka1l2gyh21di",
+        "sourceHandle": "success",
+        "target": "o6h8ir0gasva4dm9v0bmpheb",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__jk94xhdun68fka1l2gyh21disuccess-o6h8ir0gasva4dm9v0bmphebinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "lnwrr6tkfyd0bqdhi3jix6dp",
+        "sourceHandle": "success",
+        "target": "tbq1a5gjmw3mgzcfkvlx90ps",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__lnwrr6tkfyd0bqdhi3jix6dpsuccess-tbq1a5gjmw3mgzcfkvlx90psinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "tbq1a5gjmw3mgzcfkvlx90ps",
+        "sourceHandle": "success",
+        "target": "gtfjf1hxoby8guzvp093k385",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__tbq1a5gjmw3mgzcfkvlx90pssuccess-gtfjf1hxoby8guzvp093k385input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "erjolmw5de2fo6pk21kg7ldb",
+        "sourceHandle": "success",
+        "target": "sjfc32lir3jcm6uc9htih7nz",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__erjolmw5de2fo6pk21kg7ldbsuccess-sjfc32lir3jcm6uc9htih7nzinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "cvpncl6dga54bgr5k0johv0w",
+        "sourceHandle": "success",
+        "target": "jc3qondxcu9vk2k4d7t2osum",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__cvpncl6dga54bgr5k0johv0wsuccess-jc3qondxcu9vk2k4d7t2osuminput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "lqs9mcg7eiibx8bub5w1qbim",
+        "sourceHandle": "success",
+        "target": "be29phkh0ivcvspbc3xypawq",
+        "targetHandle": "input1",
+        "type": "directed",
+        "id": "xy-edge__lqs9mcg7eiibx8bub5w1qbimsuccess-be29phkh0ivcvspbc3xypawqinput1",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "zowtbib4j7h58v0o65mnu3v5",
+        "sourceHandle": "success",
+        "target": "be29phkh0ivcvspbc3xypawq",
+        "targetHandle": "input2",
+        "type": "directed",
+        "id": "xy-edge__zowtbib4j7h58v0o65mnu3v5success-be29phkh0ivcvspbc3xypawqinput2",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "be29phkh0ivcvspbc3xypawq",
+        "sourceHandle": "success",
+        "target": "450ef761-db6a-4be5-b31b-6658e7249501",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__be29phkh0ivcvspbc3xypawqsuccess-450ef761-db6a-4be5-b31b-6658e7249501input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "wu8ovaxzz7puw1p224dnj434",
+        "sourceHandle": "success",
+        "target": "ur91nhz2m4xue4t9avtthd6q",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__wu8ovaxzz7puw1p224dnj434success-ur91nhz2m4xue4t9avtthd6qinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "450ef761-db6a-4be5-b31b-6658e7249501",
+        "sourceHandle": "success",
+        "target": "j1mp819bvn5nlp8ytcydrl1m",
+        "targetHandle": "input1",
+        "type": "directed",
+        "id": "xy-edge__450ef761-db6a-4be5-b31b-6658e7249501success-j1mp819bvn5nlp8ytcydrl1minput1",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "j1mp819bvn5nlp8ytcydrl1m",
+        "sourceHandle": "success",
+        "target": "sm21n3pgmlhx6duvsxib1xd8",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__j1mp819bvn5nlp8ytcydrl1msuccess-sm21n3pgmlhx6duvsxib1xd8input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "sm21n3pgmlhx6duvsxib1xd8",
+        "sourceHandle": "success",
+        "target": "t0bqhi5eq62mqs9cespgk2ml",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__sm21n3pgmlhx6duvsxib1xd8success-t0bqhi5eq62mqs9cespgk2mlinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "t0bqhi5eq62mqs9cespgk2ml",
+        "sourceHandle": "true",
+        "target": "erjolmw5de2fo6pk21kg7ldb",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__t0bqhi5eq62mqs9cespgk2mltrue-erjolmw5de2fo6pk21kg7ldbinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "ur91nhz2m4xue4t9avtthd6q",
+        "sourceHandle": "success",
+        "target": "cuts4oht4cxdj9c16ehx673i",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__ur91nhz2m4xue4t9avtthd6qsuccess-cuts4oht4cxdj9c16ehx673iinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "cuts4oht4cxdj9c16ehx673i",
+        "sourceHandle": "true",
+        "target": "j1mp819bvn5nlp8ytcydrl1m",
+        "targetHandle": "input2",
+        "type": "directed",
+        "id": "xy-edge__cuts4oht4cxdj9c16ehx673itrue-j1mp819bvn5nlp8ytcydrl1minput2",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "450ef761-db6a-4be5-b31b-6658e7249501",
+        "sourceHandle": "success",
+        "target": "gduwca7vw351s7pvks25a09b",
+        "targetHandle": "input1",
+        "type": "directed",
+        "id": "xy-edge__450ef761-db6a-4be5-b31b-6658e7249501success-gduwca7vw351s7pvks25a09binput1",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "ur91nhz2m4xue4t9avtthd6q",
+        "sourceHandle": "error",
+        "target": "gduwca7vw351s7pvks25a09b",
+        "targetHandle": "input2",
+        "type": "directed",
+        "id": "xy-edge__ur91nhz2m4xue4t9avtthd6qerror-gduwca7vw351s7pvks25a09binput2",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "gduwca7vw351s7pvks25a09b",
+        "sourceHandle": "success",
+        "target": "e4sm7ocpb94b9ys2zdlg70wd",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__gduwca7vw351s7pvks25a09bsuccess-e4sm7ocpb94b9ys2zdlg70wdinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "450ef761-db6a-4be5-b31b-6658e7249501",
+        "sourceHandle": "success",
+        "target": "e4sm7ocpb94b9ys2zdlg70wd",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__450ef761-db6a-4be5-b31b-6658e7249501success-e4sm7ocpb94b9ys2zdlg70wdinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "tvd6v6kcf4v2mod6lgb1jdsj",
+        "sourceHandle": "success",
+        "target": "fz0nt7olyassi2sqqp8oia8i",
+        "targetHandle": "input",
+        "type": "directed",
+        "data": {
+          "isAnimated": false
+        },
+        "id": "xy-edge__tvd6v6kcf4v2mod6lgb1jdsjsuccess-fz0nt7olyassi2sqqp8oia8iinput"
+      },
+      {
+        "source": "tvd6v6kcf4v2mod6lgb1jdsj",
+        "sourceHandle": "success",
+        "target": "zowtbib4j7h58v0o65mnu3v5",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__tvd6v6kcf4v2mod6lgb1jdsjsuccess-zowtbib4j7h58v0o65mnu3v5input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "tvd6v6kcf4v2mod6lgb1jdsj",
+        "sourceHandle": "success",
+        "target": "ur91nhz2m4xue4t9avtthd6q",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__tvd6v6kcf4v2mod6lgb1jdsjsuccess-ur91nhz2m4xue4t9avtthd6qinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "lnwrr6tkfyd0bqdhi3jix6dp",
+        "sourceHandle": "success",
+        "target": "y717cwlc2b9wpcit8aon73mu",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__lnwrr6tkfyd0bqdhi3jix6dpsuccess-y717cwlc2b9wpcit8aon73muinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "y717cwlc2b9wpcit8aon73mu",
+        "sourceHandle": "success",
+        "target": "pww2xmdluxcas2znqkfpixqi",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__y717cwlc2b9wpcit8aon73musuccess-pww2xmdluxcas2znqkfpixqiinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "lixxujux4pnc5vi183hy7vut",
+        "sourceHandle": "llm",
+        "target": "pww2xmdluxcas2znqkfpixqi",
+        "targetHandle": "llm",
+        "type": "agentConnection",
+        "id": "xy-edge__lixxujux4pnc5vi183hy7vutllm-pww2xmdluxcas2znqkfpixqillm",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "pww2xmdluxcas2znqkfpixqi",
+        "sourceHandle": "success",
+        "target": "n2xmqpg6gu33pav6zbvgudem",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__pww2xmdluxcas2znqkfpixqisuccess-n2xmqpg6gu33pav6zbvgudeminput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "n2xmqpg6gu33pav6zbvgudem",
+        "sourceHandle": "success",
+        "target": "i4k03vf404n2tr4q0wap6789",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__n2xmqpg6gu33pav6zbvgudemsuccess-i4k03vf404n2tr4q0wap6789input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "pww2xmdluxcas2znqkfpixqi",
+        "sourceHandle": "success",
+        "target": "wc3e99x2ntwtik1f9fab9c0r",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__pww2xmdluxcas2znqkfpixqisuccess-wc3e99x2ntwtik1f9fab9c0rinput",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "wc3e99x2ntwtik1f9fab9c0r",
+        "sourceHandle": "success",
+        "target": "zxeuy1aaiggnr7g9cuuv50y4",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__wc3e99x2ntwtik1f9fab9c0rsuccess-zxeuy1aaiggnr7g9cuuv50y4input",
+        "data": {
+          "isAnimated": false
+        }
+      },
+      {
+        "source": "wc3e99x2ntwtik1f9fab9c0r",
+        "sourceHandle": "success",
+        "target": "sh98lphx81p0y83tib1e13ee",
+        "targetHandle": "input",
+        "type": "directed",
+        "id": "xy-edge__wc3e99x2ntwtik1f9fab9c0rsuccess-sh98lphx81p0y83tib1e13eeinput",
+        "data": {
+          "isAnimated": false
+        }
+      }
+    ],
+    "status": "stopped",
+    "tracingEnabled": true,
+    "userId": "5090f0b4-ceb5-45ff-8882-d91597f3ded6",
+    "version": 1,
+    "createdAt": 1786522584631,
+    "updatedAt": 1786806205065,
+    "publishedNames": [],
+    "previousStatus": "running"
+  }
+]
