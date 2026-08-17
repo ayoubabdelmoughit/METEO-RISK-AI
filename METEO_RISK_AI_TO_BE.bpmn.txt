@@ -1,0 +1,842 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  id="Definitions_METEO_RISK_TO_BE"
+  targetNamespace="http://meteo-risk-ai.com/bpmn">
+
+  <bpmn:process
+    id="Process_METEO_RISK_TO_BE"
+    name="METEO-RISK AI - AI Flood Early Warning - TO-BE"
+    isExecutable="false">
+
+    <bpmn:laneSet id="LaneSet_TO_BE">
+
+      <bpmn:lane id="Lane_DataSource" name="Source de données">
+        <bpmn:flowNodeRef>StartEvent</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CollectData</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SendData</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <bpmn:lane id="Lane_MeteoAI" name="METEO-RISK AI">
+        <bpmn:flowNodeRef>Task_ReceiveData</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ValidateData</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_DataValid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RejectData</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AIAnalysis</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CalculateScore</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ClassifyRisk</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_RiskLevel</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LowMonitoring</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_MediumMonitoring</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <bpmn:lane id="Lane_ABAFusion" name="ABAFusion AI">
+        <bpmn:flowNodeRef>Task_CreateAlert</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SendNotification</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CreateIncident</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AssignAction</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CloseIncident</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_GenerateReport</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_UpdateDashboard</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <bpmn:lane id="Lane_Manager" name="Responsable">
+        <bpmn:flowNodeRef>Task_ReceiveAlert</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ValidateAlert</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RejectAlert</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+      <bpmn:lane id="Lane_Field" name="Équipe terrain">
+        <bpmn:flowNodeRef>Task_Intervention</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_UpdateStatus</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Resolution</bpmn:flowNodeRef>
+      </bpmn:lane>
+
+    </bpmn:laneSet>
+
+    <!-- SOURCE DE DONNÉES -->
+
+    <bpmn:startEvent
+      id="StartEvent"
+      name="Nouvelle donnée météorologique">
+      <bpmn:outgoing>Flow_Start_Collect</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:task
+      id="Task_CollectData"
+      name="Collecter les données">
+      <bpmn:incoming>Flow_Start_Collect</bpmn:incoming>
+      <bpmn:outgoing>Flow_Collect_Send</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_SendData"
+      name="Envoyer les données">
+      <bpmn:incoming>Flow_Collect_Send</bpmn:incoming>
+      <bpmn:outgoing>Flow_Send_Receive</bpmn:outgoing>
+    </bpmn:task>
+
+    <!-- METEO-RISK AI -->
+
+    <bpmn:task
+      id="Task_ReceiveData"
+      name="Recevoir les données">
+      <bpmn:incoming>Flow_Send_Receive</bpmn:incoming>
+      <bpmn:outgoing>Flow_Receive_Validate</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_ValidateData"
+      name="Valider les données">
+      <bpmn:incoming>Flow_Receive_Validate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_Gateway</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:exclusiveGateway
+      id="Gateway_DataValid"
+      name="Données valides ?">
+      <bpmn:incoming>Flow_Validate_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_DataInvalid</bpmn:outgoing>
+      <bpmn:outgoing>Flow_DataValid</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:task
+      id="Task_RejectData"
+      name="Rejeter / signaler l'erreur">
+      <bpmn:incoming>Flow_DataInvalid</bpmn:incoming>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_AIAnalysis"
+      name="Analyse IA">
+      <bpmn:incoming>Flow_DataValid</bpmn:incoming>
+      <bpmn:outgoing>Flow_AI_Score</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_CalculateScore"
+      name="Calculer le Risk Score">
+      <bpmn:incoming>Flow_AI_Score</bpmn:incoming>
+      <bpmn:outgoing>Flow_Score_Classify</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_ClassifyRisk"
+      name="Classifier le risque">
+      <bpmn:incoming>Flow_Score_Classify</bpmn:incoming>
+      <bpmn:outgoing>Flow_Classify_Gateway</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:exclusiveGateway
+      id="Gateway_RiskLevel"
+      name="Niveau de risque ?">
+      <bpmn:incoming>Flow_Classify_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Risk_Low</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Risk_Medium</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Risk_High</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:task
+      id="Task_LowMonitoring"
+      name="Surveillance">
+      <bpmn:incoming>Flow_Risk_Low</bpmn:incoming>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_MediumMonitoring"
+      name="Surveillance renforcée">
+      <bpmn:incoming>Flow_Risk_Medium</bpmn:incoming>
+    </bpmn:task>
+
+    <!-- ABAFUSION AI -->
+
+    <bpmn:task
+      id="Task_CreateAlert"
+      name="Créer une alerte">
+      <bpmn:incoming>Flow_Risk_High</bpmn:incoming>
+      <bpmn:outgoing>Flow_Alert_Notification</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_SendNotification"
+      name="Envoyer une notification">
+      <bpmn:incoming>Flow_Alert_Notification</bpmn:incoming>
+      <bpmn:outgoing>Flow_Notification_Manager</bpmn:outgoing>
+    </bpmn:task>
+
+    <!-- RESPONSABLE -->
+
+    <bpmn:task
+      id="Task_ReceiveAlert"
+      name="Recevoir l'alerte">
+      <bpmn:incoming>Flow_Notification_Manager</bpmn:incoming>
+      <bpmn:outgoing>Flow_Manager_Validation</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:exclusiveGateway
+      id="Gateway_ValidateAlert"
+      name="Alerte validée ?">
+      <bpmn:incoming>Flow_Manager_Validation</bpmn:incoming>
+      <bpmn:outgoing>Flow_Alert_Rejected</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Alert_Validated</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:task
+      id="Task_RejectAlert"
+      name="Rejeter l'alerte">
+      <bpmn:incoming>Flow_Alert_Rejected</bpmn:incoming>
+    </bpmn:task>
+
+    <!-- ABAFUSION - INCIDENT -->
+
+    <bpmn:task
+      id="Task_CreateIncident"
+      name="Créer un incident">
+      <bpmn:incoming>Flow_Alert_Validated</bpmn:incoming>
+      <bpmn:outgoing>Flow_Incident_Assign</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_AssignAction"
+      name="Affecter une action">
+      <bpmn:incoming>Flow_Incident_Assign</bpmn:incoming>
+      <bpmn:outgoing>Flow_Assign_Intervention</bpmn:outgoing>
+    </bpmn:task>
+
+    <!-- ÉQUIPE TERRAIN -->
+
+    <bpmn:task
+      id="Task_Intervention"
+      name="Intervention terrain">
+      <bpmn:incoming>Flow_Assign_Intervention</bpmn:incoming>
+      <bpmn:outgoing>Flow_Intervention_Status</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_UpdateStatus"
+      name="Mettre à jour le statut">
+      <bpmn:incoming>Flow_Intervention_Status</bpmn:incoming>
+      <bpmn:outgoing>Flow_Status_Resolution</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_Resolution"
+      name="Résolution">
+      <bpmn:incoming>Flow_Status_Resolution</bpmn:incoming>
+      <bpmn:outgoing>Flow_Resolution_Close</bpmn:outgoing>
+    </bpmn:task>
+
+    <!-- ABAFUSION - CLÔTURE -->
+
+    <bpmn:task
+      id="Task_CloseIncident"
+      name="Clôturer l'incident">
+      <bpmn:incoming>Flow_Resolution_Close</bpmn:incoming>
+      <bpmn:outgoing>Flow_Close_Report</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_GenerateReport"
+      name="Générer le rapport">
+      <bpmn:incoming>Flow_Close_Report</bpmn:incoming>
+      <bpmn:outgoing>Flow_Report_Dashboard</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:task
+      id="Task_UpdateDashboard"
+      name="Mettre à jour le dashboard">
+      <bpmn:incoming>Flow_Report_Dashboard</bpmn:incoming>
+      <bpmn:outgoing>Flow_Dashboard_End</bpmn:outgoing>
+    </bpmn:task>
+
+    <bpmn:endEvent
+      id="EndEvent"
+      name="Processus terminé">
+      <bpmn:incoming>Flow_Dashboard_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- FLOWS -->
+
+    <bpmn:sequenceFlow
+      id="Flow_Start_Collect"
+      sourceRef="StartEvent"
+      targetRef="Task_CollectData"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Collect_Send"
+      sourceRef="Task_CollectData"
+      targetRef="Task_SendData"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Send_Receive"
+      sourceRef="Task_SendData"
+      targetRef="Task_ReceiveData"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Receive_Validate"
+      sourceRef="Task_ReceiveData"
+      targetRef="Task_ValidateData"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Validate_Gateway"
+      sourceRef="Task_ValidateData"
+      targetRef="Gateway_DataValid"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_DataInvalid"
+      name="Non"
+      sourceRef="Gateway_DataValid"
+      targetRef="Task_RejectData"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_DataValid"
+      name="Oui"
+      sourceRef="Gateway_DataValid"
+      targetRef="Task_AIAnalysis"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_AI_Score"
+      sourceRef="Task_AIAnalysis"
+      targetRef="Task_CalculateScore"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Score_Classify"
+      sourceRef="Task_CalculateScore"
+      targetRef="Task_ClassifyRisk"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Classify_Gateway"
+      sourceRef="Task_ClassifyRisk"
+      targetRef="Gateway_RiskLevel"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Risk_Low"
+      name="LOW"
+      sourceRef="Gateway_RiskLevel"
+      targetRef="Task_LowMonitoring"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Risk_Medium"
+      name="MEDIUM"
+      sourceRef="Gateway_RiskLevel"
+      targetRef="Task_MediumMonitoring"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Risk_High"
+      name="HIGH / CRITICAL"
+      sourceRef="Gateway_RiskLevel"
+      targetRef="Task_CreateAlert"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Alert_Notification"
+      sourceRef="Task_CreateAlert"
+      targetRef="Task_SendNotification"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Notification_Manager"
+      sourceRef="Task_SendNotification"
+      targetRef="Task_ReceiveAlert"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Manager_Validation"
+      sourceRef="Task_ReceiveAlert"
+      targetRef="Gateway_ValidateAlert"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Alert_Rejected"
+      name="Non"
+      sourceRef="Gateway_ValidateAlert"
+      targetRef="Task_RejectAlert"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Alert_Validated"
+      name="Oui"
+      sourceRef="Gateway_ValidateAlert"
+      targetRef="Task_CreateIncident"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Incident_Assign"
+      sourceRef="Task_CreateIncident"
+      targetRef="Task_AssignAction"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Assign_Intervention"
+      sourceRef="Task_AssignAction"
+      targetRef="Task_Intervention"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Intervention_Status"
+      sourceRef="Task_Intervention"
+      targetRef="Task_UpdateStatus"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Status_Resolution"
+      sourceRef="Task_UpdateStatus"
+      targetRef="Task_Resolution"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Resolution_Close"
+      sourceRef="Task_Resolution"
+      targetRef="Task_CloseIncident"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Close_Report"
+      sourceRef="Task_CloseIncident"
+      targetRef="Task_GenerateReport"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Report_Dashboard"
+      sourceRef="Task_GenerateReport"
+      targetRef="Task_UpdateDashboard"/>
+
+    <bpmn:sequenceFlow
+      id="Flow_Dashboard_End"
+      sourceRef="Task_UpdateDashboard"
+      targetRef="EndEvent"/>
+
+  </bpmn:process>
+
+  <bpmn:collaboration id="Collaboration_TO_BE">
+
+    <bpmn:participant
+      id="Participant_TO_BE"
+      name="METEO-RISK AI — AI Flood Early Warning"
+      processRef="Process_METEO_RISK_TO_BE"/>
+
+  </bpmn:collaboration>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_TO_BE">
+
+    <bpmndi:BPMNPlane
+      id="BPMNPlane_TO_BE"
+      bpmnElement="Collaboration_TO_BE">
+
+      <bpmndi:BPMNShape
+        id="Participant_TO_BE_di"
+        bpmnElement="Participant_TO_BE"
+        isHorizontal="true">
+        <dc:Bounds x="100" y="50" width="1900" height="850"/>
+      </bpmndi:BPMNShape>
+
+      <!-- LANES -->
+
+      <bpmndi:BPMNShape
+        id="Lane_DataSource_di"
+        bpmnElement="Lane_DataSource"
+        isHorizontal="true">
+        <dc:Bounds x="130" y="50" width="1870" height="150"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Lane_MeteoAI_di"
+        bpmnElement="Lane_MeteoAI"
+        isHorizontal="true">
+        <dc:Bounds x="130" y="200" width="1870" height="220"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Lane_ABAFusion_di"
+        bpmnElement="Lane_ABAFusion"
+        isHorizontal="true">
+        <dc:Bounds x="130" y="420" width="1870" height="220"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Lane_Manager_di"
+        bpmnElement="Lane_Manager"
+        isHorizontal="true">
+        <dc:Bounds x="130" y="640" width="1870" height="130"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Lane_Field_di"
+        bpmnElement="Lane_Field"
+        isHorizontal="true">
+        <dc:Bounds x="130" y="770" width="1870" height="130"/>
+      </bpmndi:BPMNShape>
+
+      <!-- DATA SOURCE -->
+
+      <bpmndi:BPMNShape
+        id="StartEvent_di"
+        bpmnElement="StartEvent">
+        <dc:Bounds x="200" y="105" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_CollectData_di"
+        bpmnElement="Task_CollectData">
+        <dc:Bounds x="280" y="85" width="130" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_SendData_di"
+        bpmnElement="Task_SendData">
+        <dc:Bounds x="460" y="85" width="130" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <!-- METEO AI -->
+
+      <bpmndi:BPMNShape
+        id="Task_ReceiveData_di"
+        bpmnElement="Task_ReceiveData">
+        <dc:Bounds x="650" y="250" width="130" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_ValidateData_di"
+        bpmnElement="Task_ValidateData">
+        <dc:Bounds x="820" y="250" width="130" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Gateway_DataValid_di"
+        bpmnElement="Gateway_DataValid"
+        isMarkerVisible="true">
+        <dc:Bounds x="990" y="265" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_RejectData_di"
+        bpmnElement="Task_RejectData">
+        <dc:Bounds x="1080" y="210" width="150" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_AIAnalysis_di"
+        bpmnElement="Task_AIAnalysis">
+        <dc:Bounds x="1080" y="330" width="130" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_CalculateScore_di"
+        bpmnElement="Task_CalculateScore">
+        <dc:Bounds x="1250" y="330" width="150" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_ClassifyRisk_di"
+        bpmnElement="Task_ClassifyRisk">
+        <dc:Bounds x="1430" y="330" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Gateway_RiskLevel_di"
+        bpmnElement="Gateway_RiskLevel"
+        isMarkerVisible="true">
+        <dc:Bounds x="1600" y="340" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_LowMonitoring_di"
+        bpmnElement="Task_LowMonitoring">
+        <dc:Bounds x="1700" y="215" width="130" height="60"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_MediumMonitoring_di"
+        bpmnElement="Task_MediumMonitoring">
+        <dc:Bounds x="1700" y="285" width="150" height="60"/>
+      </bpmndi:BPMNShape>
+
+      <!-- ABAFUSION -->
+
+      <bpmndi:BPMNShape
+        id="Task_CreateAlert_di"
+        bpmnElement="Task_CreateAlert">
+        <dc:Bounds x="1700" y="455" width="130" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_SendNotification_di"
+        bpmnElement="Task_SendNotification">
+        <dc:Bounds x="1860" y="455" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_CreateIncident_di"
+        bpmnElement="Task_CreateIncident">
+        <dc:Bounds x="1400" y="545" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_AssignAction_di"
+        bpmnElement="Task_AssignAction">
+        <dc:Bounds x="1220" y="545" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_CloseIncident_di"
+        bpmnElement="Task_CloseIncident">
+        <dc:Bounds x="900" y="545" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_GenerateReport_di"
+        bpmnElement="Task_GenerateReport">
+        <dc:Bounds x="700" y="545" width="150" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_UpdateDashboard_di"
+        bpmnElement="Task_UpdateDashboard">
+        <dc:Bounds x="500" y="545" width="150" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <!-- MANAGER -->
+
+      <bpmndi:BPMNShape
+        id="Task_ReceiveAlert_di"
+        bpmnElement="Task_ReceiveAlert">
+        <dc:Bounds x="1700" y="670" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Gateway_ValidateAlert_di"
+        bpmnElement="Gateway_ValidateAlert"
+        isMarkerVisible="true">
+        <dc:Bounds x="1550" y="680" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_RejectAlert_di"
+        bpmnElement="Task_RejectAlert">
+        <dc:Bounds x="1400" y="655" width="120" height="60"/>
+      </bpmndi:BPMNShape>
+
+      <!-- FIELD -->
+
+      <bpmndi:BPMNShape
+        id="Task_Intervention_di"
+        bpmnElement="Task_Intervention">
+        <dc:Bounds x="1080" y="800" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_UpdateStatus_di"
+        bpmnElement="Task_UpdateStatus">
+        <dc:Bounds x="900" y="800" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="Task_Resolution_di"
+        bpmnElement="Task_Resolution">
+        <dc:Bounds x="700" y="800" width="140" height="70"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape
+        id="EndEvent_di"
+        bpmnElement="EndEvent">
+        <dc:Bounds x="420" y="817" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <!-- EDGES -->
+
+      <bpmndi:BPMNEdge
+        id="Flow_Start_Collect_di"
+        bpmnElement="Flow_Start_Collect">
+        <di:waypoint x="236" y="123"/>
+        <di:waypoint x="280" y="125"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Collect_Send_di"
+        bpmnElement="Flow_Collect_Send">
+        <di:waypoint x="410" y="125"/>
+        <di:waypoint x="460" y="125"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Send_Receive_di"
+        bpmnElement="Flow_Send_Receive">
+        <di:waypoint x="590" y="125"/>
+        <di:waypoint x="620" y="125"/>
+        <di:waypoint x="620" y="290"/>
+        <di:waypoint x="650" y="290"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Receive_Validate_di"
+        bpmnElement="Flow_Receive_Validate">
+        <di:waypoint x="780" y="290"/>
+        <di:waypoint x="820" y="290"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Validate_Gateway_di"
+        bpmnElement="Flow_Validate_Gateway">
+        <di:waypoint x="950" y="290"/>
+        <di:waypoint x="990" y="290"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_DataInvalid_di"
+        bpmnElement="Flow_DataInvalid">
+        <di:waypoint x="1040" y="290"/>
+        <di:waypoint x="1060" y="290"/>
+        <di:waypoint x="1060" y="245"/>
+        <di:waypoint x="1080" y="245"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_DataValid_di"
+        bpmnElement="Flow_DataValid">
+        <di:waypoint x="1040" y="290"/>
+        <di:waypoint x="1060" y="290"/>
+        <di:waypoint x="1060" y="365"/>
+        <di:waypoint x="1080" y="365"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_AI_Score_di"
+        bpmnElement="Flow_AI_Score">
+        <di:waypoint x="1210" y="365"/>
+        <di:waypoint x="1250" y="365"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Score_Classify_di"
+        bpmnElement="Flow_Score_Classify">
+        <di:waypoint x="1400" y="365"/>
+        <di:waypoint x="1430" y="365"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Classify_Gateway_di"
+        bpmnElement="Flow_Classify_Gateway">
+        <di:waypoint x="1570" y="365"/>
+        <di:waypoint x="1600" y="365"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Risk_Low_di"
+        bpmnElement="Flow_Risk_Low">
+        <di:waypoint x="1625" y="340"/>
+        <di:waypoint x="1660" y="340"/>
+        <di:waypoint x="1660" y="245"/>
+        <di:waypoint x="1700" y="245"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Risk_Medium_di"
+        bpmnElement="Flow_Risk_Medium">
+        <di:waypoint x="1625" y="365"/>
+        <di:waypoint x="1700" y="315"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Risk_High_di"
+        bpmnElement="Flow_Risk_High">
+        <di:waypoint x="1625" y="390"/>
+        <di:waypoint x="1660" y="390"/>
+        <di:waypoint x="1660" y="490"/>
+        <di:waypoint x="1700" y="490"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Alert_Notification_di"
+        bpmnElement="Flow_Alert_Notification">
+        <di:waypoint x="1830" y="490"/>
+        <di:waypoint x="1860" y="490"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Notification_Manager_di"
+        bpmnElement="Flow_Notification_Manager">
+        <di:waypoint x="1930" y="525"/>
+        <di:waypoint x="1930" y="705"/>
+        <di:waypoint x="1840" y="705"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Manager_Validation_di"
+        bpmnElement="Flow_Manager_Validation">
+        <di:waypoint x="1700" y="705"/>
+        <di:waypoint x="1600" y="705"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Alert_Rejected_di"
+        bpmnElement="Flow_Alert_Rejected">
+        <di:waypoint x="1550" y="705"/>
+        <di:waypoint x="1520" y="705"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Alert_Validated_di"
+        bpmnElement="Flow_Alert_Validated">
+        <di:waypoint x="1575" y="730"/>
+        <di:waypoint x="1575" y="580"/>
+        <di:waypoint x="1540" y="580"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Incident_Assign_di"
+        bpmnElement="Flow_Incident_Assign">
+        <di:waypoint x="1400" y="580"/>
+        <di:waypoint x="1360" y="580"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Assign_Intervention_di"
+        bpmnElement="Flow_Assign_Intervention">
+        <di:waypoint x="1220" y="580"/>
+        <di:waypoint x="1150" y="580"/>
+        <di:waypoint x="1150" y="800"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Intervention_Status_di"
+        bpmnElement="Flow_Intervention_Status">
+        <di:waypoint x="1080" y="835"/>
+        <di:waypoint x="1040" y="835"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Status_Resolution_di"
+        bpmnElement="Flow_Status_Resolution">
+        <di:waypoint x="900" y="835"/>
+        <di:waypoint x="840" y="835"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Resolution_Close_di"
+        bpmnElement="Flow_Resolution_Close">
+        <di:waypoint x="700" y="835"/>
+        <di:waypoint x="620" y="835"/>
+        <di:waypoint x="620" y="580"/>
+        <di:waypoint x="900" y="580"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Close_Report_di"
+        bpmnElement="Flow_Close_Report">
+        <di:waypoint x="900" y="580"/>
+        <di:waypoint x="850" y="580"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Report_Dashboard_di"
+        bpmnElement="Flow_Report_Dashboard">
+        <di:waypoint x="700" y="580"/>
+        <di:waypoint x="650" y="580"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge
+        id="Flow_Dashboard_End_di"
+        bpmnElement="Flow_Dashboard_End">
+        <di:waypoint x="500" y="580"/>
+        <di:waypoint x="450" y="580"/>
+        <di:waypoint x="450" y="817"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>METEO-RISK AI Command Center</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+  <div class="app">
+
+    <header class="topbar">
+      <div>
+        <h1>🌊 METEO-RISK AI</h1>
+        <p>AI Flood Early Warning & Incident Management</p>
+      </div>
+
+      <div class="live-box">
+        <span class="live-dot"></span>
+        LIVE
+      </div>
+    </header>
+
+
+    <!-- ========================================
+         ALERT BANNER
+    ======================================== -->
+
+    <div id="alertBanner" class="alert-banner">
+
+      <div>
+        <strong id="alertTitle">
+          🚨 EMERGENCY ALERT
+        </strong>
+
+        <p id="alertMessage">
+          Critical flood risk detected.
+        </p>
+      </div>
+
+      <div id="alertCity">
+        Casablanca
+      </div>
+
+    </div>
+
+
+    <!-- ========================================
+         KPI
+    ======================================== -->
+
+    <section class="kpi-grid">
+
+      <div class="card">
+        <span>Risk Level</span>
+        <h2 id="riskLevel">--</h2>
+      </div>
+
+      <div class="card">
+        <span>Risk Score</span>
+        <h2 id="riskScore">--</h2>
+      </div>
+
+      <div class="card">
+        <span>Water Level</span>
+        <h2 id="waterLevel">-- cm</h2>
+      </div>
+
+      <div class="card">
+        <span>Incident Status</span>
+        <h2 id="incidentStatus">--</h2>
+      </div>
+
+    </section>
+
+
+    <!-- ========================================
+         WATER + WEATHER
+    ======================================== -->
+
+    <section class="main-grid">
+
+      <div class="panel">
+
+        <h3>🌊 Water Monitoring</h3>
+
+        <div class="data-row">
+          <span>Current Level</span>
+          <strong id="currentWater">-- cm</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Previous Level</span>
+          <strong id="previousWater">-- cm</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Rise Rate</span>
+          <strong id="riseRate">-- cm</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Trend</span>
+          <strong id="waterTrend">--</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Warning Threshold</span>
+          <strong id="warningLevel">-- cm</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Critical Threshold</span>
+          <strong id="criticalLevel">-- cm</strong>
+        </div>
+
+      </div>
+
+
+      <div class="panel">
+
+        <h3>🌦️ Weather</h3>
+
+        <div class="data-row">
+          <span>Temperature</span>
+          <strong id="temperature">-- °C</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Humidity</span>
+          <strong id="humidity">-- %</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Rain</span>
+          <strong id="rain">-- mm</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Wind</span>
+          <strong id="wind">-- km/h</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Wind Gust</span>
+          <strong id="gust">-- km/h</strong>
+        </div>
+
+        <div class="data-row">
+          <span>Pressure</span>
+          <strong id="pressure">-- hPa</strong>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ========================================
+         CHARTS
+    ======================================== -->
+
+    <section class="chart-grid">
+
+      <div class="panel">
+
+        <h3>🌊 Water Level Monitoring</h3>
+
+        <div class="water-gauge">
+
+          <div class="gauge-value">
+            <span id="gaugeWaterLevel">--</span>
+            <small>cm</small>
+          </div>
+
+          <div class="gauge-bar">
+
+            <div
+              id="gaugeFill"
+              class="gauge-fill">
+            </div>
+
+            <div class="warning-marker">
+              <span>70</span>
+            </div>
+
+            <div class="critical-marker">
+              <span>90</span>
+            </div>
+
+          </div>
+
+          <div class="gauge-labels">
+            <span>0 cm</span>
+            <span>120 cm</span>
+          </div>
+
+          <div
+            id="gaugeStatus"
+            class="gauge-status">
+            --
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="panel">
+
+        <h3>📊 Risk Indicators</h3>
+
+        <canvas id="riskChart"></canvas>
+
+      </div>
+
+    </section>
+
+
+    <!-- ========================================
+         LATEST INCIDENT
+    ======================================== -->
+
+    <section class="panel incident-panel">
+
+      <h3>🚨 Latest Incident</h3>
+
+      <div class="incident-grid">
+
+        <div>
+          <span>Incident ID</span>
+          <strong id="incidentId">--</strong>
+        </div>
+
+        <div>
+          <span>Type</span>
+          <strong id="incidentType">--</strong>
+        </div>
+
+        <div>
+          <span>Priority</span>
+          <strong id="incidentPriority">--</strong>
+        </div>
+
+        <div>
+          <span>Severity</span>
+          <strong id="incidentSeverity">--</strong>
+        </div>
+
+      </div>
+
+
+      <!-- FINAL INCIDENT BADGE -->
+
+      <div
+        id="incidentFinalBadge"
+        class="incident-final-badge">
+
+        <strong id="incidentFinalTitle">
+          ✅ INCIDENT CLOSED
+        </strong>
+
+        <span id="incidentFinalMessage">
+          Situation returned to normal
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <!-- ========================================
+         INCIDENT TIMELINE
+    ======================================== -->
+
+    <section class="panel">
+
+      <h3>🕘 Incident Timeline</h3>
+
+      <div
+        id="timeline"
+        class="timeline">
+
+        <div class="timeline-item">
+          Waiting for incident history...
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ========================================
+         AI INCIDENT REPORT
+    ======================================== -->
+
+    <section
+      id="aiReportPanel"
+      class="panel ai-report-panel">
+
+      <div class="ai-report-header">
+
+        <div>
+          <h3>🤖 AI Incident Report</h3>
+
+          <p>
+            Rapport automatique généré après la clôture de l'incident.
+          </p>
+        </div>
+
+        <button
+          id="toggleAiReport"
+          class="ai-report-button"
+          type="button">
+
+          📄 View Report
+
+        </button>
+
+      </div>
+
+
+      <div class="ai-report-meta">
+
+        <div>
+          <span>Incident ID</span>
+          <strong id="aiReportIncidentId">
+            --
+          </strong>
+        </div>
+
+        <div>
+          <span>Status</span>
+          <strong id="aiReportStatus">
+            --
+          </strong>
+        </div>
+
+        <div>
+          <span>Generated</span>
+          <strong id="aiReportGeneratedAt">
+            --
+          </strong>
+        </div>
+
+      </div>
+
+
+      <div
+        id="aiReportContent"
+        class="ai-report-content">
+
+        <p>
+          Aucun rapport IA chargé.
+        </p>
+
+      </div>
+
+    </section>
+
+
+    <!-- ========================================
+         FOOTER
+    ======================================== -->
+
+    <footer>
+      METEO-RISK AI — Flood Monitoring Command Center
+    </footer>
+
+  </div>
+
+
+  <script src="app.js"></script>
+
+</body>
+</html>

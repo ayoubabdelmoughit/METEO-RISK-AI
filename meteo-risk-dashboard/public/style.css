@@ -1,0 +1,863 @@
+/* ========================================
+   RESET
+======================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: #07111f;
+  color: #ffffff;
+  min-height: 100vh;
+}
+
+.app {
+  width: 94%;
+  max-width: 1500px;
+  margin: auto;
+  padding: 25px 0;
+}
+
+
+/* ========================================
+   HEADER
+======================================== */
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 22px 25px;
+  margin-bottom: 22px;
+
+  background: #0d1b2a;
+  border: 1px solid #1e344c;
+  border-radius: 16px;
+}
+
+.topbar h1 {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.topbar p {
+  color: #8fa9c1;
+}
+
+.live-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  font-weight: bold;
+  color: #31e981;
+}
+
+.live-dot {
+  width: 11px;
+  height: 11px;
+
+  border-radius: 50%;
+
+  background: #31e981;
+  box-shadow: 0 0 12px #31e981;
+}
+
+
+/* ========================================
+   ALERT BANNER
+======================================== */
+
+.alert-banner {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+
+  padding: 18px 22px;
+  margin-bottom: 20px;
+
+  background: rgba(255, 77, 90, 0.12);
+  border: 1px solid #ff4d5a;
+  border-radius: 14px;
+
+  box-shadow: 0 0 20px rgba(255, 77, 90, 0.15);
+}
+
+.alert-banner strong {
+  display: block;
+
+  color: #ff4d5a;
+  font-size: 18px;
+
+  margin-bottom: 6px;
+}
+
+.alert-banner p {
+  color: #ffffff;
+}
+
+#alertCity {
+  font-weight: bold;
+  color: #ff8b94;
+}
+
+
+/* ========================================
+   ALERT - MEDIUM
+======================================== */
+
+.alert-medium {
+  background: rgba(255, 209, 102, 0.12);
+  border-color: #ffd166;
+
+  box-shadow:
+    0 0 20px rgba(255, 209, 102, 0.15);
+}
+
+.alert-medium strong,
+.alert-medium #alertCity {
+  color: #ffd166;
+}
+
+
+/* ========================================
+   ALERT - HIGH
+======================================== */
+
+.alert-high {
+  background: rgba(255, 159, 67, 0.12);
+  border-color: #ff9f43;
+
+  box-shadow:
+    0 0 20px rgba(255, 159, 67, 0.15);
+}
+
+.alert-high strong,
+.alert-high #alertCity {
+  color: #ff9f43;
+}
+
+
+/* ========================================
+   ALERT - CRITICAL
+======================================== */
+
+.alert-critical {
+  background: rgba(255, 77, 90, 0.12);
+  border-color: #ff4d5a;
+
+  box-shadow:
+    0 0 20px rgba(255, 77, 90, 0.18);
+}
+
+.alert-critical strong,
+.alert-critical #alertCity {
+  color: #ff4d5a;
+}
+
+
+/* ========================================
+   KPI
+======================================== */
+
+.kpi-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 18px;
+
+  margin-bottom: 20px;
+}
+
+.card {
+  background: #0d1b2a;
+
+  border: 1px solid #1e344c;
+  border-radius: 15px;
+
+  padding: 22px;
+}
+
+.card span {
+  color: #8fa9c1;
+
+  font-size: 14px;
+
+  text-transform: uppercase;
+}
+
+.card h2 {
+  font-size: 29px;
+
+  margin-top: 12px;
+}
+
+
+/* ========================================
+   RISK STATUS COLORS
+======================================== */
+
+.status-low {
+  color: #31e981;
+}
+
+.status-medium {
+  color: #ffd166;
+}
+
+.status-high {
+  color: #ff9f43;
+}
+
+.status-critical {
+  color: #ff4d5a;
+
+  text-shadow:
+    0 0 10px rgba(255, 77, 90, 0.5);
+}
+
+
+/* ========================================
+   INCIDENT STATUS COLORS
+======================================== */
+
+#incidentStatus.incident-active {
+  color: #ff4d5a !important;
+
+  text-shadow:
+    0 0 10px rgba(255, 77, 90, 0.4);
+}
+
+#incidentStatus.incident-completed {
+  color: #ffd166 !important;
+}
+
+#incidentStatus.incident-resolved {
+  color: #4dabf7 !important;
+}
+
+#incidentStatus.incident-closed {
+  color: #31e981 !important;
+
+  text-shadow:
+    0 0 10px rgba(49, 233, 129, 0.6);
+}
+
+
+/* ========================================
+   PANELS
+======================================== */
+
+.main-grid,
+.chart-grid {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 20px;
+
+  margin-bottom: 20px;
+}
+
+.panel {
+  background: #0d1b2a;
+
+  border: 1px solid #1e344c;
+  border-radius: 15px;
+
+  padding: 22px;
+
+  margin-bottom: 20px;
+}
+
+.panel h3 {
+  margin-bottom: 20px;
+
+  font-size: 18px;
+}
+
+
+/* ========================================
+   DATA ROWS
+======================================== */
+
+.data-row {
+  display: flex;
+
+  justify-content: space-between;
+
+  padding: 13px 0;
+
+  border-bottom:
+    1px solid #182c40;
+}
+
+.data-row span {
+  color: #8fa9c1;
+}
+
+.data-row strong {
+  font-weight: 600;
+}
+
+
+/* ========================================
+   WATER LEVEL GAUGE
+======================================== */
+
+.water-gauge {
+  padding: 25px 10px 10px;
+}
+
+.gauge-value {
+  text-align: center;
+
+  margin-bottom: 30px;
+}
+
+.gauge-value span {
+  font-size: 52px;
+
+  font-weight: 800;
+
+  line-height: 1;
+}
+
+.gauge-value small {
+  margin-left: 6px;
+
+  color: #8fa9c1;
+
+  font-size: 18px;
+}
+
+
+/* Gauge background */
+
+.gauge-bar {
+  position: relative;
+
+  width: 100%;
+  height: 30px;
+
+  margin-top: 20px;
+
+  background: #17283a;
+
+  border: 1px solid #29425b;
+
+  border-radius: 20px;
+
+  overflow: visible;
+}
+
+
+/* Gauge fill */
+
+.gauge-fill {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  height: 100%;
+  width: 0%;
+
+  background: #31e981;
+
+  border-radius: 20px;
+
+  z-index: 1;
+
+  transition:
+    width 0.8s ease,
+    background 0.4s ease;
+}
+
+
+/* ========================================
+   WARNING MARKER - 70 CM
+======================================== */
+
+.warning-marker {
+  position: absolute;
+
+  left: 58.33%;
+  top: -10px;
+
+  width: 2px;
+  height: 48px;
+
+  background: #ffd166;
+
+  z-index: 3;
+}
+
+.warning-marker span {
+  position: absolute;
+
+  top: -24px;
+  left: -10px;
+
+  color: #ffd166;
+
+  font-size: 12px;
+  font-weight: bold;
+}
+
+
+/* ========================================
+   CRITICAL MARKER - 90 CM
+======================================== */
+
+.critical-marker {
+  position: absolute;
+
+  left: 75%;
+  top: -10px;
+
+  width: 2px;
+  height: 48px;
+
+  background: #ff4d5a;
+
+  z-index: 3;
+}
+
+.critical-marker span {
+  position: absolute;
+
+  top: -24px;
+  left: -10px;
+
+  color: #ff4d5a;
+
+  font-size: 12px;
+  font-weight: bold;
+}
+
+
+/* Gauge labels */
+
+.gauge-labels {
+  display: flex;
+
+  justify-content: space-between;
+
+  margin-top: 12px;
+
+  color: #8fa9c1;
+
+  font-size: 13px;
+}
+
+
+/* Gauge status */
+
+.gauge-status {
+  margin-top: 25px;
+
+  padding: 12px 16px;
+
+  text-align: center;
+
+  background: #17283a;
+
+  border: 1px solid #29425b;
+
+  border-radius: 10px;
+
+  font-size: 18px;
+
+  font-weight: 800;
+}
+
+
+/* ========================================
+   INCIDENT DETAILS
+======================================== */
+
+.incident-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 15px;
+}
+
+.incident-grid div {
+  background: #081522;
+
+  padding: 16px;
+
+  border-radius: 10px;
+}
+
+.incident-grid span {
+  display: block;
+
+  color: #8fa9c1;
+
+  font-size: 12px;
+
+  margin-bottom: 8px;
+}
+
+.incident-grid strong {
+  color: #ffffff;
+}
+
+
+/* ========================================
+   TIMELINE
+======================================== */
+
+.timeline {
+  display: flex;
+
+  gap: 15px;
+
+  flex-wrap: wrap;
+}
+
+.timeline-item {
+  padding: 12px 17px;
+
+  border-radius: 9px;
+
+  background: #081522;
+
+  border: 1px solid #29425b;
+}
+
+.timeline-item strong {
+  color: #ffffff;
+}
+
+.timeline-item small {
+  color: #8fa9c1;
+}
+
+
+/* ========================================
+   CHARTS
+======================================== */
+
+canvas {
+  width: 100% !important;
+
+  max-height: 300px;
+}
+
+
+/* ========================================
+   FOOTER
+======================================== */
+
+footer {
+  text-align: center;
+
+  padding: 20px;
+
+  color: #66839d;
+
+  font-size: 13px;
+}
+
+
+/* ========================================
+   TABLET
+======================================== */
+
+@media (max-width: 900px) {
+
+  .kpi-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+  .main-grid,
+  .chart-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .incident-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+
+}
+
+
+/* ========================================
+   MOBILE
+======================================== */
+
+@media (max-width: 550px) {
+
+  .kpi-grid,
+  .incident-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 15px;
+  }
+
+  .alert-banner {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+
+}
+/* ========================================
+   INCIDENT TIMELINE COLORS
+======================================== */
+
+.timeline-in-progress {
+  border-color: #ff4d5a !important;
+  color: #ff4d5a;
+  box-shadow: 0 0 8px rgba(255, 77, 90, 0.25);
+}
+
+.timeline-completed {
+  border-color: #ffd166 !important;
+  color: #ffd166;
+  box-shadow: 0 0 8px rgba(255, 209, 102, 0.20);
+}
+
+.timeline-resolved {
+  border-color: #4dabf7 !important;
+  color: #4dabf7;
+  box-shadow: 0 0 8px rgba(77, 171, 247, 0.20);
+}
+
+.timeline-closed {
+  border-color: #31e981 !important;
+  color: #31e981;
+  box-shadow: 0 0 8px rgba(49, 233, 129, 0.25);
+}
+
+/* La date reste lisible */
+.timeline-item small {
+  color: #8fa9c1;
+}
+/* ========================================
+   FINAL INCIDENT BADGE
+======================================== */
+
+.incident-final-badge {
+  display: none;
+
+  margin-top: 18px;
+  padding: 14px 18px;
+
+  border: 1px solid #31e981;
+  border-radius: 10px;
+
+  background: rgba(49, 233, 129, 0.08);
+
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.incident-final-badge strong {
+  color: #31e981;
+  font-size: 16px;
+}
+
+.incident-final-badge span {
+  color: #8fa9c1;
+  font-size: 14px;
+}
+/* ========================================
+   AI INCIDENT REPORT
+======================================== */
+
+.ai-report-panel {
+  margin-top: 20px;
+}
+
+
+/* HEADER */
+
+.ai-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+
+  margin-bottom: 20px;
+}
+
+.ai-report-header h3 {
+  margin-bottom: 6px;
+}
+
+.ai-report-header p {
+  color: #8fa9c1;
+  font-size: 14px;
+}
+
+
+/* BUTTON */
+
+.ai-report-button {
+  padding: 11px 18px;
+
+  background: #17283a;
+  color: #ffffff;
+
+  border: 1px solid #4dabf7;
+  border-radius: 9px;
+
+  font-size: 14px;
+  font-weight: bold;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.ai-report-button:hover {
+  background: #1e344c;
+  box-shadow: 0 0 10px rgba(77, 171, 247, 0.25);
+}
+
+
+/* ========================================
+   REPORT INFORMATION
+======================================== */
+
+.ai-report-meta {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 15px;
+
+  margin-bottom: 20px;
+}
+
+.ai-report-meta div {
+  background: #081522;
+
+  padding: 15px;
+
+  border-radius: 10px;
+
+  border: 1px solid #182c40;
+}
+
+.ai-report-meta span {
+  display: block;
+
+  color: #8fa9c1;
+
+  font-size: 12px;
+
+  margin-bottom: 7px;
+}
+
+.ai-report-meta strong {
+  color: #ffffff;
+
+  font-size: 14px;
+}
+
+
+/* REPORT GENERATED STATUS */
+
+#aiReportStatus {
+  color: #31e981;
+}
+
+
+/* ========================================
+   REPORT CONTENT
+======================================== */
+
+.ai-report-content {
+  display: none;
+
+  background: #081522;
+
+  border: 1px solid #29425b;
+  border-radius: 12px;
+
+  padding: 25px;
+
+  color: #ffffff;
+
+  line-height: 1.7;
+
+  white-space: pre-wrap;
+
+  max-height: 600px;
+
+  overflow-y: auto;
+}
+
+
+/* OPEN REPORT */
+
+.ai-report-content.open {
+  display: block;
+}
+
+
+/* REPORT SCROLLBAR */
+
+.ai-report-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ai-report-content::-webkit-scrollbar-track {
+  background: #081522;
+}
+
+.ai-report-content::-webkit-scrollbar-thumb {
+  background: #29425b;
+  border-radius: 10px;
+}
+
+
+/* ========================================
+   MOBILE
+======================================== */
+
+@media (max-width: 700px) {
+
+  .ai-report-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ai-report-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-report-button {
+    width: 100%;
+  }
+
+}
